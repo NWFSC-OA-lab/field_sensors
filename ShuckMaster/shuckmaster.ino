@@ -9,7 +9,11 @@
 
 #include "src/Durafet.h"
 
+#include "src/TimedToggleRelay.h"
+
 Durafet df;
+
+TimedToggleRelay pump(5/* TODO pick GPIO pin*/, 1000);
 
 RTC_DS3231 rtc;
 FileLogger logger;
@@ -71,6 +75,8 @@ void setup() {
     Serial.println("Couldn't find Durafet");
   }
 
+  pump.Begin();
+
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
   uint32_t eepromMagic = 0;
   EEPROM.get(eepromMagicAddress, eepromMagic);
@@ -112,12 +118,14 @@ void printDate(const DateTime& date) {
   Serial.print(date.second(), DEC);
 }
 
-void loop() {  
+void loop() {
+  df.Tick();
+  pump.Tick();
+  
   if (rtc.lostPower()) {
     rtcHealthy = false;
   }
-
-  df.Tick();
+  
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
     // log ph
     logger.LogFloat(rtc.now(), "pH", df.GetPh());
