@@ -277,6 +277,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         }
     }
 
+    val httpRequestQueue = JsonHttpRequestQueue()
+
     private fun onPacketReceived(packet: Packet) {
         // val buffer = ByteBuffer.allocate(packet.data.size).order(ByteOrder.LITTLE_ENDIAN)
         val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN)
@@ -336,7 +338,6 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 }
 
                 // build json packet with entries
-                val jsonEntries = JSONArray()
                 entries.forEach {
                     Log.i("ReceivedPacket", "$id\t${it.unixTime}\t${it.entryValue}\t$label")
                     val jsonEntry = JSONObject()
@@ -344,20 +345,11 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     jsonEntry.put("date", it.unixTime)
                     jsonEntry.put(label, it.entryValue)
 
-                    // Log.i("Data", jsonEntry.toString())
-
-                    jsonEntries.put(jsonEntry)
-
-                    // val time = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-                    // val data = JSONObject()
-                    // data.put("sensorID", 2)
-                    // data.put("temp", time.get(Calendar.MINUTE))
-                    // data.put("date", time.time.time / 1000)
-                    HttpRequestTask(
+                    httpRequestQueue.addRequest(
                         "POST",
                         "http://44.201.14.18:1337/newMeasurement",
                         jsonEntry
-                    ).execute()
+                    )
                 }
             }
         }
@@ -558,16 +550,28 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         }
 
         test_http_button.setOnClickListener {
-            val time = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-            val data = JSONObject()
-            data.put("sensorID", 1)
-            data.put("pH", time.get(Calendar.MINUTE))
-            data.put("date", time.time.time / 1000)
+            val jsonArray = JSONArray()
+            for (i in 1..5) {
+                val time = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+                val data = JSONObject()
+                data.put("sensorID", 2)
+                data.put("pH", i)
+                data.put("date", time.time.time / 1000)
+                jsonArray.put(data)
+                httpRequestQueue.addRequest(
+                    "POST",
+                    "http://44.201.14.18:1337/newMeasurement",
+                    data
+                )
+            }
+            /*
             HttpRequestTask(
                 "POST",
                 "http://44.201.14.18:1337/newMeasurement",
                 data
             ).execute()
+
+             */
         }
 
         request_label_spinner.onItemSelectedListener = this

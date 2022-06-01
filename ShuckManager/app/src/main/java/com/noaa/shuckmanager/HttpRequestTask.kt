@@ -2,6 +2,7 @@ package com.noaa.shuckmanager
 
 import android.os.AsyncTask
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.*
 import java.net.HttpURLConnection
@@ -15,7 +16,8 @@ import java.net.URL
 class HttpRequestTask (
     val method: String,
     val uri: String,
-    val jsonData: JSONObject
+    val jsonData: JSONObject,
+    val onResult: () -> Unit
 ): AsyncTask<String, Unit, String?>() {
     var response: String = ""
 
@@ -55,6 +57,8 @@ class HttpRequestTask (
 
     override fun onPostExecute(result: String?) {
         super.onPostExecute(result)
+
+        onResult()
         if (result != null) {
             Log.i("GetRequest", "Response: $result")
         }
