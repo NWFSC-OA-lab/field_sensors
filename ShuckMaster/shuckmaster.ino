@@ -7,6 +7,10 @@
 #include "src/util/PacketSender.h"
 #include "src/Packets.h"
 
+#include "src/Durafet.h"
+
+Durafet df;
+
 RTC_DS3231 rtc;
 FileLogger logger;
 char dataLabel[16] = "PH";
@@ -30,6 +34,7 @@ bool sending = false;
 
 bool sdHealthy = false;
 bool rtcHealthy = false;
+bool dfHealthy = false;
 
 unsigned long lastByteReadMillis = 0;
 unsigned long lastPHStoredMillis = 0;
@@ -59,6 +64,13 @@ void setup() {
   lastByteReadMillis = millis();
   lastPHStoredMillis = millis();
 
+  if (df.Begin()) {
+    Serial.println("Durafet initialized successfully");
+    dfHealthy = true;
+  } else {
+    Serial.println("Couldn't find Durafet");
+  }
+
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
   uint32_t eepromMagic = 0;
   EEPROM.get(eepromMagicAddress, eepromMagic);
@@ -78,6 +90,9 @@ void setup() {
   Serial.println(cachedConfig.unixtime);
   Serial.print("PH measurement period: ");
   Serial.println(cachedConfig.phPeriod);
+
+  // update calibration with stored values
+  df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
   
   receiver.Begin();
   sending = false;
@@ -97,41 +112,57 @@ void printDate(const DateTime& date) {
   Serial.print(date.second(), DEC);
 }
 
-void loop() {
+void loop() {  
   if (rtc.lostPower()) {
     rtcHealthy = false;
   }
 
+  df.Tick();
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
-    // TODO log ph
+    // log ph
+    logger.LogFloat(rtc.now(), "pH", df.GetPh());
+
+    // log temperature
+    logger.LogFloat(rtc.now(), "tp", df.GetTemp());
     lastPHStoredMillis = millis();
   }
   
   if (sending) {
-    int N = 10; // number of entries per packet, TODO put this somewhere else
+    const int N = 10; // number of entries per packet, TODO put this somewhere else
+    struct FileEntry entries[N];
+    
     // start building packet
     sender.Begin(PACKET_DATA);
 
     // send number of entries
-    sender.AddByte((byte) (N & 0xFF));
+    // sender.AddByte((byte) (N & 0xFF));
     
     // grab up to N entries from logger (or until entries run out)
     //  - add entry to packet
     Serial.println("-----------");
-    
+
+    byte numEntries = 0;    
     for (int i = 0; i < N && logger.Available(); i++) {
       struct FileEntry entry;
       DateTime dt;
-      logger.ReadEntry(&entry);
-      sender.AddBuf((char *) &entry, sizeof(entry));
-      dt = DateTime(entry.unixTime);
+      logger.ReadEntry(&(entries[i]));
+      // sender.AddBuf((char *) &entry, sizeof(entry));
+      dt = DateTime(entries[i].unixTime);
       printDate(dt);
       Serial.print("\t");
-      Serial.println(entry.floatVal);
+      Serial.println(entries[i].floatVal);
+      numEntries++;
     }
-
+    
     // add sensor id
     sender.AddByte(sensorID);
+    
+    // send number of entries
+    sender.AddByte((byte) (numEntries & 0xFF));
+
+    for (int i = 0; i < numEntries; i++) {
+      sender.AddBuf((char *) &(entries[i]), sizeof(struct FileEntry));
+    }
 
     // add the label to the end of the packet
     logger.GetLabel(dataLabel);
@@ -219,6 +250,9 @@ void loop() {
             cachedConfig.stdVoltage = configPacket.config.stdVoltage;
           }
           EEPROM.put(0, cachedConfig);
+
+          // update durafet calibration values
+          df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
           break;
         }
         case PACKET_DATA: {

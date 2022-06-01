@@ -24,7 +24,7 @@ class PacketReceiver {
     private var state = STATE.SYNC
         set(value) {
             field = value
-            Log.i("PacketReceiver", "State changed: $value")
+            // Log.i("PacketReceiver", "State changed: $value")
             when (value) {
                 STATE.SYNC -> dataLeft = SYNC_PATTERN.size
                 STATE.LENGTH -> dataLeft = 2
@@ -44,7 +44,7 @@ class PacketReceiver {
         // readBuffer.put(array)
 
         for (byte in array) {
-            Log.i("PacketReceiver", "$byte")
+            // Log.i("PacketReceiver", "$byte")
             when (state) {
                 STATE.SYNC -> {
                     val index = 4 - dataLeft
@@ -60,14 +60,14 @@ class PacketReceiver {
                 }
                 STATE.LENGTH -> {
                     currLength = ((currLength ushr 8) or (byte.toInt() shl 8)) and 0xFFFF
-                    // Log.i("PacketReceiver", "Length: $byte with $currLength")
+                    Log.i("PacketReceiver", "Length: $byte with $currLength")
                     dataLeft--
                     if (dataLeft <= 0)
                         state = STATE.ID
                 }
                 STATE.ID -> {
                     currId = byte
-                    // Log.i("PacketReceiver", "ID: $byte")
+                    Log.i("PacketReceiver", "ID: $byte")
                     if (currLength - 1 > 0) {
                         state = STATE.DATA
                     } else {

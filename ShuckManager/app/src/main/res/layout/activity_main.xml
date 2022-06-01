@@ -95,10 +95,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:layout_marginBottom="8dp"
             android:text="Request"
-            app:layout_constraintBottom_toTopOf="@+id/device_config_button"
+            app:layout_constraintBottom_toTopOf="@+id/request_label_spinner"
             app:layout_constraintEnd_toEndOf="@+id/device_config_button"
+            app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent" />
 
         <Button
@@ -153,8 +153,10 @@
             android:layout_marginBottom="8dp"
             app:layout_constraintBottom_toTopOf="@+id/device_request_button"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/device_addr_text" />
+            app:layout_constraintTop_toBottomOf="@+id/device_addr_text"
+            app:layout_constraintVertical_bias="0.0" />
 
         <Button
             android:id="@+id/start_date_button"
@@ -184,5 +186,16 @@
             android:text="to"
             app:layout_constraintEnd_toStartOf="@+id/end_date_button"
             app:layout_constraintTop_toTopOf="@+id/end_date_button" />
+
+        <Spinner
+            android:id="@+id/request_label_spinner"
+            android:layout_width="0dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="16dp"
+            app:layout_constraintBottom_toTopOf="@+id/device_config_button"
+            app:layout_constraintEnd_toEndOf="@+id/device_request_button"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent" />
     </android.support.constraint.ConstraintLayout>
 </android.support.constraint.ConstraintLayout>

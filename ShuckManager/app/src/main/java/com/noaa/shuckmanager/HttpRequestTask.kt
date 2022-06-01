@@ -30,6 +30,8 @@ class HttpRequestTask (
             conn.setRequestProperty("Accept", "application/json");
             conn.doInput = true
 
+            Log.i("GetRequest", "Packet: ${jsonData}")
+
             conn.outputStream.use {
                 it.write(jsonData.toString().toByteArray())
                 it.flush()

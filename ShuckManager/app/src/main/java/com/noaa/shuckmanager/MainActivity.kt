@@ -23,6 +23,8 @@ import android.text.InputType
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
 import kotlinx.android.synthetic.main.activity_main.*
@@ -46,7 +48,7 @@ private const val SHUCKMASTER_SERV_UUID = "000040aa-0000-1000-8000-00805f9b34fb"
 private const val SHUCKMASTER_CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
 private const val CCC_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805f9b34fb"
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
     private val SYNC_PATTERN = byteArrayOf(0x01, 0x02, 0x03, 0x04)
     private val receiver = PacketReceiver()
@@ -139,6 +141,11 @@ class MainActivity : AppCompatActivity() {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.w("BluetoothGattCallback", "Successfully connected to $deviceAddress")
                     connectedDevice = gatt
+
+                    val len = receivedPackets.size
+                    receivedPackets.clear()
+                    receivedPacketAdapter.notifyItemRangeRemoved(0, len)
+
                     Handler(Looper.getMainLooper()).post {
                         gatt.discoverServices()
                     }
@@ -153,6 +160,7 @@ class MainActivity : AppCompatActivity() {
                     AlertDialog.Builder(this@MainActivity)
                         .setTitle("Connection timed out, please reconnect.")
                         .setCancelable(false)
+                        .setPositiveButton("OK") { _, _ -> }
                         .create()
                         .show()
                 }
@@ -172,9 +180,6 @@ class MainActivity : AppCompatActivity() {
                 // gatt.requestMtu(GATT_MAX_MTU_SIZE)
                 val characteristic = getRWCharacteristic()
                 if (characteristic != null) {
-                    val len = receivedPackets.size
-                    receivedPackets.clear()
-                    receivedPacketAdapter.notifyItemRangeRemoved(0, len)
                     enableNotifications(characteristic)
                 }
             }
@@ -294,15 +299,6 @@ class MainActivity : AppCompatActivity() {
                 Log.i("ReceivedPacket", "${packet.data.toHexString()}")
 
                 val entries = mutableListOf<DataEntry>()
-                val entryCount = buffer.get().toInt()
-
-                for (i in 0..entryCount) {
-                    if (buffer.hasRemaining()) {
-                        val time = buffer.getInt()
-                        val entry = buffer.getFloat()
-                        entries.add(DataEntry(time, entry))
-                    }
-                }
 
                 // get ID byte
                 val id = if (buffer.hasRemaining()) {
@@ -311,12 +307,30 @@ class MainActivity : AppCompatActivity() {
                     0
                 }
 
+                // get number of entries
+                val entryCount = if (buffer.hasRemaining()) {
+                    buffer.get().toInt()
+                } else {
+                    0
+                }
+
+                Log.i("Data", "$entryCount")
+
+                for (i in 0 until entryCount) {
+                    Log.i("Data", "$i")
+                    if (buffer.hasRemaining()) {
+                        val time = buffer.getInt()
+                        val entry = buffer.getFloat()
+                        entries.add(DataEntry(time, entry))
+                    }
+                }
+
                 // get label, minus null terminator if possible
                 val label = if (buffer.hasRemaining()) {
                     val len = buffer.remaining() - 1
                     val strArray = ByteArray(len)
                     buffer.get(strArray)
-                    strArray.toString()
+                    strArray.decodeToString()
                 } else {
                     "inv"   // no label
                 }
@@ -330,7 +344,20 @@ class MainActivity : AppCompatActivity() {
                     jsonEntry.put("date", it.unixTime)
                     jsonEntry.put(label, it.entryValue)
 
+                    // Log.i("Data", jsonEntry.toString())
+
                     jsonEntries.put(jsonEntry)
+
+                    // val time = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+                    // val data = JSONObject()
+                    // data.put("sensorID", 2)
+                    // data.put("temp", time.get(Calendar.MINUTE))
+                    // data.put("date", time.time.time / 1000)
+                    HttpRequestTask(
+                        "POST",
+                        "http://44.201.14.18:1337/newMeasurement",
+                        jsonEntry
+                    ).execute()
                 }
             }
         }
@@ -378,6 +405,10 @@ class MainActivity : AppCompatActivity() {
                 calendar.get(Calendar.DAY_OF_MONTH)).show()
         }
     }
+
+
+    private val labels = arrayOf("pH", "tp")
+    private var currentLabel = labels[0]
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -511,15 +542,15 @@ class MainActivity : AppCompatActivity() {
                 highDate = startDate
             }
 
-            val label = "ph"
+            // val label = "ph"
 
-            val buffer = ByteBuffer.allocate(4 + 2 + 1 + 4 + 4 + label.length + 1).order(ByteOrder.LITTLE_ENDIAN)
+            val buffer = ByteBuffer.allocate(4 + 2 + 1 + 4 + 4 + currentLabel.length + 1).order(ByteOrder.LITTLE_ENDIAN)
                 .put(SYNC_PATTERN)
-                .putShort(9)
+                .putShort((9 + currentLabel.length + 1).toShort())
                 .put(PacketType.DATA.code)
                 .putInt((lowDate.time.time / 1000).toInt())
                 .putInt((highDate.time.time / 1000).toInt())
-                .put(label.toByteArray()).put(0.toByte())       // null terminated label string
+                .put(currentLabel.toByteArray()).put(0.toByte())       // null terminated label string
             Log.i("Write", buffer.array().toHexString())
             Log.i("write", "${(lowDate.time.time / 1000)}")
             Log.i("write", "${(highDate.time.time / 1000)}")
@@ -529,8 +560,8 @@ class MainActivity : AppCompatActivity() {
         test_http_button.setOnClickListener {
             val time = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
             val data = JSONObject()
-            data.put("sensorID", 2)
-            data.put("temp", time.get(Calendar.MINUTE))
+            data.put("sensorID", 1)
+            data.put("pH", time.get(Calendar.MINUTE))
             data.put("date", time.time.time / 1000)
             HttpRequestTask(
                 "POST",
@@ -538,6 +569,15 @@ class MainActivity : AppCompatActivity() {
                 data
             ).execute()
         }
+
+        request_label_spinner.onItemSelectedListener = this
+        val arrAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            labels
+        )
+        arrAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        request_label_spinner.adapter = arrAdapter
 
         connectedDevice = null
 
@@ -605,7 +645,6 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
             val alert = alertBuilder.create()
-            alert.setTitle("hella alert")
             alert.show()
         }
     }
@@ -816,6 +855,14 @@ class MainActivity : AppCompatActivity() {
                 dialog.cancel()
             }
             .show()
+    }
+
+    override fun onItemSelected(parent: AdapterView<*>, view: View, position: Int, id: Long) {
+        // Log.i("ItemSelected", "$position")
+        currentLabel = labels[position]
+    }
+
+    override fun onNothingSelected(parent: AdapterView<*>?) {
     }
 }
 
