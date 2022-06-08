@@ -13,7 +13,7 @@
 
 Durafet df;
 
-TimedToggleRelay pump(5/* TODO pick GPIO pin*/, 1000);
+TimedToggleRelay pump(23/* TODO pick GPIO pin*/, 5000);
 
 RTC_DS3231 rtc;
 FileLogger logger;
@@ -21,7 +21,7 @@ char dataLabel[16] = "PH";
 
 HardwareSerial& hm10 = Serial2;
 
-const uint8_t sensorID = 1;
+const uint8_t sensorID = 4;
 
 const uint32_t syncPattern = 0x04030201;
 
@@ -96,6 +96,12 @@ void setup() {
   Serial.println(cachedConfig.unixtime);
   Serial.print("PH measurement period: ");
   Serial.println(cachedConfig.phPeriod);
+  Serial.print("Standard pH: ");
+  Serial.println(cachedConfig.stdPh, 4);
+  Serial.print("Standard Temperature: ");
+  Serial.println(cachedConfig.stdTemperature, 4);
+  Serial.print("Standard Voltage: ");
+  Serial.println(cachedConfig.stdVoltage, 4);
 
   // update calibration with stored values
   df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
@@ -127,11 +133,21 @@ void loop() {
   }
   
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
+    float ph = df.GetPh();
+    float temp = df.GetTemp();
+
+    Serial.print("Made pH and temperature measurements! pH: ");
+    Serial.print(ph, 4);
+    Serial.print(",\tTemperature: ");
+    Serial.print(temp, 4);
+    Serial.println(" C");
     // log ph
-    logger.LogFloat(rtc.now(), "pH", df.GetPh());
+    logger.LogFloat(rtc.now(), "pH", ph);
 
     // log temperature
-    logger.LogFloat(rtc.now(), "tp", df.GetTemp());
+    logger.LogFloat(rtc.now(), "tp", temp);
+
+    // logger.LogFloat(rtc.now(), "pH", rtc.now().second());
     lastPHStoredMillis = millis();
   }
   

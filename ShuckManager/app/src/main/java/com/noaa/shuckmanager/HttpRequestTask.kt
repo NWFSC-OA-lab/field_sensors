@@ -9,10 +9,7 @@ import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.URL
 
-// params:
-//  0: Request type
-//  1: URL
-//  2:
+// Asynchronous task sending JSON packets to the given URI according to the given method
 class HttpRequestTask (
     val method: String,
     val uri: String,
@@ -26,6 +23,7 @@ class HttpRequestTask (
             val url = URL(uri);
             val conn = url.openConnection() as HttpURLConnection
 
+            // Request header
             conn.requestMethod = method
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
@@ -34,14 +32,15 @@ class HttpRequestTask (
 
             Log.i("GetRequest", "Packet: ${jsonData}")
 
+            // Write JSON data to the request body
             conn.outputStream.use {
                 it.write(jsonData.toString().toByteArray())
                 it.flush()
             }
 
-            // conn.outputStream.flush()
-
+            // Waits until a response code is received
             if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                // Read response data
                 response = readStream(conn.inputStream)
                 Log.i("GetRequest", "OK: ${uri}")
                 return response
@@ -55,6 +54,7 @@ class HttpRequestTask (
         return null
     }
 
+    // Called after response is received, or on failure
     override fun onPostExecute(result: String?) {
         super.onPostExecute(result)
 
@@ -70,6 +70,7 @@ class HttpRequestTask (
         }
     }
 
+    // Reads from the given input stream into a string
     private fun readStream(input: InputStream): String {
         var reader: BufferedReader? = null
         var response = StringBuffer()

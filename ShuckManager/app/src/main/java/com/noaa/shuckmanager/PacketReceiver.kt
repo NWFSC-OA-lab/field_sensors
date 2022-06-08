@@ -4,11 +4,15 @@ import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+// Packet receipt manager, reads byte arrays and converts them to packets
 class PacketReceiver {
+    // Sync pattern, used to recognize new packets in a stream of bytes
     private val SYNC_PATTERN = byteArrayOf(0x01, 0x02, 0x03, 0x04)
 
+    // FIFO queue of complete packets received that have not been read externally
     private val packetBuffer = ArrayDeque<Packet>()
 
+    // Receiver state machine states
     enum class STATE {
         SYNC,
         LENGTH,
@@ -16,15 +20,24 @@ class PacketReceiver {
         DATA
     }
 
+    // Length field, short
     private var currLength = 0
+
+    // ID field, byte
     private var currId: Byte = 0x0
+
+    // Data, bytes
     private var currData: ByteBuffer? = null
 
+    // Bytes needed to be read in the current state
     private var dataLeft = 0
+
+    // Current state
     private var state = STATE.SYNC
         set(value) {
             field = value
-            // Log.i("PacketReceiver", "State changed: $value")
+
+            // Set data left based on new state
             when (value) {
                 STATE.SYNC -> dataLeft = SYNC_PATTERN.size
                 STATE.LENGTH -> dataLeft = 2
@@ -36,10 +49,12 @@ class PacketReceiver {
             }
         }
 
+    // Initialize state to SYNC on startup
     init {
         state = STATE.SYNC
     }
 
+    // Receive an array of bytes, advancing state machine or recognizing new packets
     fun putByteArray(array: ByteArray) {
         // readBuffer.put(array)
 

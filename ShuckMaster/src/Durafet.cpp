@@ -34,7 +34,7 @@ void Durafet::Tick() {
     
     float res = v_thermistor / current;
     
-    float T_K = (1 / (SH_A + SH_B * log(res) + SH_C * pow(log(res), 3))) + 0.2016;
+    float T_K = (1 / (SH_A + SH_B * log(res) + SH_C * pow(log(res), 3))) + 0.2368;
     
     // Serial.println("----------------");
     
@@ -82,5 +82,5 @@ float Durafet::GetPh() {
   return _lastPh;
 }
 float Durafet::GetTemp() {
-  return _lastTemp;
+  return _lastTemp - ZERO_C_K;
 }

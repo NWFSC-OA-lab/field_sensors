@@ -1,5 +1,6 @@
 package com.noaa.shuckmanager
 
+// Packet IDs
 enum class PacketType(val code: Byte) {
     PING(0x00),
     HEALTH(0x01),
