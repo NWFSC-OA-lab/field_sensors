@@ -394,7 +394,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 }
                 httpRequestQueue.addRequest(
                     "POST",
-                    "http://44.201.14.18:1337/newMeasurement",
+                    "http://3.236.166.131:1337/newMeasurement",
                     JSONObject().put("batch", array)
                 )
             }
@@ -449,7 +449,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     }
 
     // Requestable data types
-    private val labels = arrayOf("pH", "tp")
+    private val labels = arrayOf("pH", "tp", "voltage")
 
     // Current data type to request
     private var currentLabel = labels[0]
@@ -619,7 +619,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             data.put("date", time.time.time / 1000)
             httpRequestQueue.addRequest(
                 "POST",
-                "http://44.201.14.18:1337/newMeasurement",
+                "http://3.236.166.131:1337/newMeasurement",
                 data
             )
         }
