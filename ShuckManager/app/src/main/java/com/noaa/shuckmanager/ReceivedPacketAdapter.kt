@@ -29,6 +29,7 @@ class ReceivedPacketAdapter (
         private val view: View
     ) : RecyclerView.ViewHolder(view) {
         fun bind(packet: Packet) {
+            //AX: This will print out the data as a HEX string. We could just print it was a string tho and not in hex...
             view.packet_content.text = "[${packet.id}] ${packet.data.toHexString()}"
         }
     }
