@@ -8,7 +8,7 @@
 #include "PacketSender.h"
 
 void PacketSender::Begin(uint8_t id) {
-  _id = id; //This is the packet id (e.g, Ping, Health, Data, Calibrate)
+  _id = id; //This is the packet id (which will be the sensor ID)
   _len = 0; //This is the length of the buffer. Initialized to 0
   _off = sizeof(_sync) + sizeof(_len); //This is the offset, or the current index value
 
