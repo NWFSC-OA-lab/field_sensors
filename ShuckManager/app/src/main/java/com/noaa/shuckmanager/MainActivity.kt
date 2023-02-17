@@ -46,8 +46,9 @@ private const val LOCATION_PERMISSION_REQUEST_CODE = 2
 private const val GATT_MIN_MTU_SIZE = 23
 private const val GATT_MAX_MTU_SIZE = 517
 
-// Service and Characteristic UUIDs for the HM-10 r/w channel
-private const val SHUCKMASTER_SERV_UUID = "000040aa-0000-1000-8000-00805f9b34fb"
+// Service and Characteristic UUIDs for the HM-10 r/w channel (BLE identifiers)
+// SERV_UUID "000040aa for previous shuckmaster configuration
+private const val SHUCKMASTER_SERV_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb"
 private const val SHUCKMASTER_CHAR_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb"
 
 // Client Characteristic Configuration descriptor UUID (for setting notifications
