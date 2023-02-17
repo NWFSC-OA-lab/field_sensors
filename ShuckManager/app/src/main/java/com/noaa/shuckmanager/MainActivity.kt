@@ -430,7 +430,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     // Create date selector buttons
     fun setupDateSetButton(calendar: Calendar, button: Button) {
         button.text = "--/--/----"
-
+    //I think this prompts the user which date to use from the calendar
         val listener = DatePickerDialog.OnDateSetListener { _, year, month, dayOfMonth ->
             calendar.set(Calendar.YEAR, year)
             calendar.set(Calendar.MONTH, month)
@@ -440,7 +440,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             val sdf = SimpleDateFormat(format, Locale.US)
             button.text = sdf.format(calendar.time)
         }
-
+    //Or this might do that
         button.setOnClickListener {
             DatePickerDialog(this@MainActivity,
                 listener,
@@ -456,20 +456,22 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     // Current data type to request
     private var currentLabel = labels[0]
 
+    //TODO: What is a bundle?
+    //What I think this does: takes a bundle of information and fetches data. If so needs a much more intuitive function name.
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        super.onCreate(savedInstanceState) //What's the superclass of oncreate?
         setContentView(R.layout.activity_main)
 
-        // Set up the low and high date buttons
-        setupDateSetButton(startDate, start_date_button)
+        // Set up the low and high date buttons with setupDateSetButton function
+        setupDateSetButton(startDate, start_date_button) //defined at line 431 takes in
         setupDateSetButton(endDate, end_date_button)
 
-        // Scan button, toggles scanning
+        // Toggles scanning of BLE devices when Scan button is clicked
         scan_button.setOnClickListener {
             if (isScanning) {
-                stopBleScan()
+                stopBleScan() //declared at line 730
             } else{
-                startBleScan()
+                startBleScan() //declared at line 7
             }
         }
 
@@ -478,14 +480,14 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             connectedDevice?.disconnect()
         }
 
-        // Sends a ping packet
+        // Sends a ping packet to ____ when ping button is clicked
         device_ping_button.setOnClickListener {
             val buffer = ByteBuffer.allocate(7).order(ByteOrder.LITTLE_ENDIAN)
                 .put(SYNC_PATTERN)
                 .putShort(1)
                 .put(PacketType.PING.code)
             Log.i("Write", buffer.array().toHexString())
-            writePacket(buffer.array())
+            writePacket(buffer.array()) //declared at line 790
         }
 
         // Sends a health status packet
@@ -776,8 +778,9 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         return properties and property != 0
     }
 
+    //TODO: figure out how read packet works
     private fun readPacket() {
-        val char = getRWCharacteristic()
+        val char = getRWCharacteristic() //defined at line 851
         if (char?.isReadable() == true) {
             connectedDevice?.readCharacteristic(char)
         }
@@ -850,7 +853,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         val servUUID = UUID.fromString(SHUCKMASTER_SERV_UUID)
         val charUUID = UUID.fromString(SHUCKMASTER_CHAR_UUID)
 
-        return connectedDevice?.getService(servUUID)?.getCharacteristic(charUUID)
+        return connectedDevice?.getService(servUUID)?.getCharacteristic(charUUID) //connectedDevice on line 410
     }
 
     // Sets up scan results list UI element
