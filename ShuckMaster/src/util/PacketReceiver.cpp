@@ -15,7 +15,7 @@ constexpr bool DEBUG = true;
 
 void PacketReceiver::Begin() {
   _offset = 0;
-  _plen = 0;
+  _plen = 0; //packet length
   _id = 0;
   _mode = Syncing;
 
@@ -30,20 +30,20 @@ bool PacketReceiver::AddByte(uint8_t readbyte) {
   }
   switch (_mode) {
     case Syncing:
-      _pattern = ((uint32_t) readbyte << 24) | (_pattern >> 8);
+      _pattern = ((uint32_t) readbyte << 24) | (_pattern >> 8); //shifts existing pattern by one byte and sets MSB to new readbyte
 
       if (DEBUG) Serial.print(F("Syncing: "));
       if (DEBUG) Serial.println(_pattern, HEX);
       
-      if (_pattern == _sync) {
+      if (_pattern == _sync) { //compared with expected sync pattern to determine if beginning of packet has been found
         _mode = Length;
-        _toRead = sizeof(_plen);
+        _toRead = sizeof(_plen); //sets toread to size in bytes of packet length
         if (DEBUG) Serial.println(F("Sync found, moving to Length"));
       }
       break;
     case Length:
-      _plen = ((uint16_t) readbyte << 8) | (_plen >> 8);
-      _toRead--;
+      _plen = ((uint16_t) readbyte << 8) | (_plen >> 8); //updates plen. MSB vurrent byte. LSB previous byte
+      _toRead--; //one byte of length field has been read
 
       if (DEBUG) Serial.print(F("Length: "));
       if (DEBUG) Serial.println(_plen, HEX);
@@ -76,7 +76,7 @@ bool PacketReceiver::AddByte(uint8_t readbyte) {
       }
       break;
     case Data:
-      _dataBuf[_offset++] = readbyte;
+      _dataBuf[_offset++] = readbyte; //stores payload data at current offset index and then increments to point to next index
       _toRead--;
 
       if (DEBUG) Serial.print(F("Data: "));
