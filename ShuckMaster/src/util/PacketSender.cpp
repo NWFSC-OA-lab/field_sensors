@@ -21,8 +21,6 @@ After the byte is added to the buffer, it increments the variables _off and _len
 _off is used to keep track of the current index in the buffer
 _len is the length of the buffer
 */
-
-
 int PacketSender::AddByte(uint8_t addbyte) {
   _buf[_off] = addbyte; //storing addbyte at index _buff[_off]
   _off++; //increment index number by 1
@@ -60,7 +58,7 @@ int PacketSender::AddShort(uint16_t addshort) {
   return AddBuf((char *) &addshort, sizeof(uint16_t));
 }
 
-//This function works the same as AddShort except with 32-bits
+//This function works the same as AddShort except with a long
 int PacketSender::AddLong(uint32_t addlong) {
   return AddBuf((char *) &addlong, sizeof(uint32_t));
 }
@@ -78,7 +76,6 @@ int PacketSender::AddStr(const char *str) {
 }
 
 // writes length to buffer at the start, sends full packet over given serial
-
 /*
 This function takes in the HardwareSerial& serial and writes to the serial port
 and returns the number of bytes written. 
