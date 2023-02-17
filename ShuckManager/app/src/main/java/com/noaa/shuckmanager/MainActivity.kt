@@ -321,14 +321,28 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
     // FIFO queue of HTTP requests in line to be sent to the web server
     val httpRequestQueue = JsonHttpRequestQueue()
-
+    
+    // Callback invoked whenever a complete packet is received
+    /*AX: This function takes in a variable of type Packet and names the variable "packet". When a packet is received, it looks
+          at the id of the packet to determine what type of packet it is (i.e, Ping, Health (status), Config, or Data). Each type has
+          different actions that the function will do.
+    */
+    
     // Callback invoked whenever a complete packet is received
     private fun onPacketReceived(packet: Packet) {
         // Convert the packet data to a buffer, interpreted in little endian
-        val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN)
+        val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN) //AX: ByteBuffer.wrap converts the array to a buffer. 
+                                                                                 //AX: ByteOrder.LITTLE_ENDIAN sorts the buffer by least significant bit first
+                                                                                 
+        //when packet.id == PIND.code, HEALTH.code, CONFIG.code, or DATA.code, do a specific thing...
         when(packet.id) {
             PacketType.PING.code -> {
+                
                 // received ping
+                //AX: Log.i is a function used to send a log message of category type "INFO". 
+                //AX: The first parameter is the tag and the second parameter is the actual message
+                //AX: The messages are printed in the logcat section
+                
                 Log.i("ReceivedPacket", "Received Ping")
             }
             PacketType.HEALTH.code -> {
@@ -339,15 +353,40 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 // received config
                 Log.i("ReceivedPacket", "Received Config - successful")
             }
+            
+            //AX: If the packet.id is a data packet...
             PacketType.DATA.code -> {
                 // received data
+                
+                /* AX: 
+                When a packet with the type PacketType.DATA is received, the code performs the following actions:
+                1) Logs a message with the tag "ReceivedPacket" and the message "Received Data".
+                2) Extracts the number of data entries contained in the packet.
+                3) For each data entry, it extracts the time (stored as an integer) and the entry 
+                   value (stored as a float). The extracted time and entry value are stored in an 
+                   instance of DataEntry class and added to a list of DataEntry objects.
+                4) The code also retrieves a label associated with the data entries. The label is a string 
+                   that describes the type of data that is being recorded.
+                5) The extracted time, entry value, and label are used to create a JSON object representing the 
+                   data. The JSON objects are then added to a JSON array.
+                6) Finally, the code sends a batch of the JSON objects to a server at the specified URL 
+                   (http://3.236.166.131:1337/newMeasurement) using an HTTP POST request. The request is added to 
+                   a queue of HTTP requests (httpRequestQueue) to be executed later.
+                */
+                
                 Log.i("ReceivedPacket", "Received Data")
+                //AX: Display a Log.i INFO message with the packet's data as a Hex String
                 Log.i("ReceivedPacket", "${packet.data.toHexString()}")
 
                 // translate data to a JSON object, then send it
+                //AX: Creates a buffer called "entries"
+
                 val entries = mutableListOf<DataEntry>()
 
                 // get ID byte
+                // AX: This if-else statement checks if the buffer has any remaining bit, if TRUE
+                //     then it stores the next bit in the variable "id". If FALSE, sets "id" to 0
+                // AX: Takes the next bit and converts it to an int. This bit tells us how much data is in the packet
                 val id = if (buffer.hasRemaining()) {
                     buffer.get()
                 } else {
@@ -363,6 +402,9 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
                 Log.i("Data", "$entryCount")
 
+                //Step 3
+                //AX: This for loop will display each data entry, while also storing the 
+                //    data entry and time into the entries buffer
                 for (i in 0 until entryCount) {
                     Log.i("Data", "$i")
                     if (buffer.hasRemaining()) {
@@ -372,7 +414,11 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     }
                 }
 
+                //Step 4
                 // get label, minus null terminator if possible
+                //AX: This if-else statement gets the data label (i.e: pH, tp, or Voltage)
+                //    and converts them to strings for readability 
+                
                 val label = if (buffer.hasRemaining()) {
                     val len = buffer.remaining() - 1
                     val strArray = ByteArray(len)
@@ -382,7 +428,9 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     "inv"   // no label
                 }
 
+                //Step 5
                 // build json packet with entries, send as batch
+                // AX: This line of code will create a JSON object and store each DataType in entries in the JSON object
                 val array = JSONArray()
                 entries.forEach {
                     Log.i("ReceivedPacket", "$id\t${it.unixTime}\t${it.entryValue}\t$label")
@@ -392,6 +440,9 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     jsonEntry.put(label, it.entryValue)
                     array.put(jsonEntry)
                 }
+                
+                //Step 6
+                //AX: This line of code will send the JSON object to a webserver with the provided URL
                 httpRequestQueue.addRequest(
                     "POST",
                     "http://3.236.166.131:1337/newMeasurement",
