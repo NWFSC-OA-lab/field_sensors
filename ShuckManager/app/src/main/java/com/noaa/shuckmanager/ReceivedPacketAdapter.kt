@@ -30,7 +30,9 @@ class ReceivedPacketAdapter (
     ) : RecyclerView.ViewHolder(view) {
         fun bind(packet: Packet) {
             //AX: This will print out the data as a HEX string. We could just print it was a string tho and not in hex...
-            view.packet_content.text = "[${packet.id}] ${packet.data.toHexString()}"
+            //view.packet_content.text = "[${packet.id}] ${String(packet.data)}"
+            //view.packet_content.text = "[${String(packet.id)}] ${packet.data.toHexString()}"
+            view.packet_content.text = "[${packet.id}] ${String(packet.data)}"
         }
     }
 
