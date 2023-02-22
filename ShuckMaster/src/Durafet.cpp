@@ -1,6 +1,17 @@
 #include <Arduino.h>
 #include "Durafet.h"
 
+float analogReadSteps = 1023.0; //how many bits the analog read returns
+float analogReadFullScale = 5.0; //how many volts the full scale analog read measurement corresponds to
+float thermistorSeriesResistance = 10000.0; //in ohms
+
+//these constants are calculated for GAIN_TWO, need to recalculate for other gains
+//https://github.com/adafruit/Adafruit_ADS1X15/blob/master/examples/differential/differential.ino
+//see this example for how to use different gain ranges
+float ADCreadSteps = 4095.0; //how many bits ADC read returns
+float bitsPerVolt = 1000.0; //1 bit is 1mV for GAIN_TWO
+float ADCreadOffset = 2.048; //what voltage a full scale reading corresponds to
+
 float average(float numbers[], int len) {
   float sum = 0;
   for (int x = 0; x < len; x++) {
@@ -21,20 +32,40 @@ bool Durafet::Begin() {
 
 void Durafet::Tick() {
   if (millis() - _lastTick > 1000) {
-    int16_t results1, results2;  
+    int16_t results1, results2;
     float multiplier = 0.0625;
     results1 = _ads.readADC_Differential_0_1();
     results2 = _ads.readADC_Differential_2_3();
+	
+	float results1_volts;
+	results1_volts = _ads.computeVolts(results1);
+	
+	//print ph probe voltage for calibration
+	//Serial.print("PH probe voltage: ");
+	//Serial.println(results1_volts);
+	
+	float results2_volts;
+	results2_volts = _ads.computeVolts(results2);
+	
+	//print thermistor voltage for calibration
+	//Serial.print("Thermistor Voltage: ");
+	//Serial.println(results2_volts);
     
-    int high = analogRead(A0);
-    int low = analogRead(A1);
-    float voltage = (high - low) * (5.0 / 1023.0);
-    float current = (results2 * multiplier / 1000.0) / 9990.0;
-    float v_thermistor = voltage - (results2 * multiplier / 1000.0);
+	//circuit for thermistor should be thermistor in series with a resistor across a voltage, in this case a 10k ohm resistor and across 3.3V. 
+    float thermistor_posvoltage = (analogRead(A0) / analogReadSteps) * analogReadFullScale;
+    float thermistor_negvoltage = (analogRead(A1) / analogReadSteps) * analogReadFullScale;
+	
+	float thermistor_differentialvoltage = thermistor_posvoltage - thermistor_negvoltage;
+
+    //resistance of thermistor
+	float thermistorCurrent = results2_volts / thermistorSeriesResistance;
+	
+    float res = thermistor_differentialvoltage / thermistorCurrent - thermistorSeriesResistance;
     
-    float res = v_thermistor / current;
-    
-    float T_K = (1 / (SH_A + SH_B * log(res) + SH_C * pow(log(res), 3))) + 0.2368;
+    float T_K = (1 / (SH_A + SH_B * log(res) + SH_C * pow(log(res), 3))) - 10.0;
+	
+	//Serial.print("temperature in kelvin: ");
+	//Serial.println(T_K);
     
     // Serial.println("----------------");
     

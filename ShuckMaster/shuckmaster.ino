@@ -80,11 +80,12 @@ void setup() {
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
   uint32_t eepromMagic = 0;
   EEPROM.get(eepromMagicAddress, eepromMagic);
-  if (eepromMagic != eepromMagicValue) {
+  //if (eepromMagic != eepromMagicValue) {
+  if (true) {
     Serial.println("EEPROM magic value not found, initializing configuration");
     cachedConfig;
     cachedConfig.unixtime = rtc.now().unixtime();
-    cachedConfig.phPeriod = 15 * 60; // 15 minutes
+    cachedConfig.phPeriod = 10; // 10 seconds
     EEPROM.put(0, cachedConfig);
     EEPROM.put(eepromMagicAddress, eepromMagicValue);
   } else {
@@ -127,11 +128,7 @@ void printDate(const DateTime& date) {
 void loop() {
   df.Tick();
   pump.Tick();
-  
-  if (rtc.lostPower()) {
-    rtcHealthy = false;
-  }
-  
+
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
     float ph = df.GetPh();
     float temp = df.GetTemp();
