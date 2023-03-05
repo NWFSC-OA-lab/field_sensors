@@ -294,7 +294,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         ) {
             with (characteristic) {
                 if (service.uuid == UUID.fromString(SHUCKMASTER_SERV_UUID) &&
-                    uuid == UUID.fromString(SHUCKMASTER_CHAR_UUID)) {
+                        uuid == UUID.fromString(SHUCKMASTER_CHAR_UUID)) {
                     // Notification belongs to the right characteristic
 
                     // Give new data to the receiver to parse
@@ -325,6 +325,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     // Callback invoked whenever a complete packet is received
     private fun onPacketReceived(packet: Packet) {
         // Convert the packet data to a buffer, interpreted in little endian
+        //TODO: Convert this process into a function to improve efficiency and readability
         val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN)
         when(packet.id) {
             PacketType.PING.code -> {
@@ -345,7 +346,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 Log.i("ReceivedPacket", "Data Information")
                 Log.i("ReceivedPacket", "${packet.data.toHexString()}")
                 Log.i("ReceivedPacket", "${String(packet.data)}")
-
+                Log.i("ReceivedPacket", "End of data")
                 // translate data to a JSON object, then send it
                 val entries = mutableListOf<DataEntry>()
 
@@ -385,15 +386,23 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 }
 
                 // build json packet with entries, send as batch
+
                 val array = JSONArray()
-                entries.forEach {
+                val dataArray = emptyArray<Float>()
+                entries.forEach { it ->
+                    //it.entryValue is the actual data value
+                    //TODO: Figure out to print it.entryValue to the app
                     Log.i("ReceivedPacket", "$id\t${it.unixTime}\t${it.entryValue}\t$label")
+                    val dataInfo = "$id\t${it.unixTime}\t${it.entryValue}\t$label"
+                    print(dataInfo)
+                    //receivedPacketAdapter(it.entryValue)
                     val jsonEntry = JSONObject()
                     jsonEntry.put("sensorID", id)
                     jsonEntry.put("date", it.unixTime)
                     jsonEntry.put(label, it.entryValue)
                     array.put(jsonEntry)
                 }
+                //TODO: Set up the webserver and change the URL
                 httpRequestQueue.addRequest(
                     "POST",
                     "http://3.236.166.131:1337/newMeasurement",
@@ -430,7 +439,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     // Create date selector buttons
     fun setupDateSetButton(calendar: Calendar, button: Button) {
         button.text = "--/--/----"
-    //I think this prompts the user which date to use from the calendar
+
         val listener = DatePickerDialog.OnDateSetListener { _, year, month, dayOfMonth ->
             calendar.set(Calendar.YEAR, year)
             calendar.set(Calendar.MONTH, month)
@@ -440,7 +449,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             val sdf = SimpleDateFormat(format, Locale.US)
             button.text = sdf.format(calendar.time)
         }
-    //Or this might do that
+
         button.setOnClickListener {
             DatePickerDialog(this@MainActivity,
                 listener,
@@ -456,22 +465,20 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     // Current data type to request
     private var currentLabel = labels[0]
 
-    //TODO: What is a bundle?
-    //What I think this does: takes a bundle of information and fetches data. If so needs a much more intuitive function name.
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState) //What's the superclass of oncreate?
+        super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Set up the low and high date buttons with setupDateSetButton function
-        setupDateSetButton(startDate, start_date_button) //defined at line 431 takes in
+        // Set up the low and high date buttons
+        setupDateSetButton(startDate, start_date_button)
         setupDateSetButton(endDate, end_date_button)
 
-        // Toggles scanning of BLE devices when Scan button is clicked
+        // Scan button, toggles scanning
         scan_button.setOnClickListener {
             if (isScanning) {
-                stopBleScan() //declared at line 730
+                stopBleScan()
             } else{
-                startBleScan() //declared at line 7
+                startBleScan()
             }
         }
 
@@ -480,14 +487,14 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             connectedDevice?.disconnect()
         }
 
-        // Sends a ping packet to ____ when ping button is clicked
+        // Sends a ping packet
         device_ping_button.setOnClickListener {
             val buffer = ByteBuffer.allocate(7).order(ByteOrder.LITTLE_ENDIAN)
                 .put(SYNC_PATTERN)
                 .putShort(1)
                 .put(PacketType.PING.code)
             Log.i("Write", buffer.array().toHexString())
-            writePacket(buffer.array()) //declared at line 790
+            writePacket(buffer.array())
         }
 
         // Sends a health status packet
@@ -701,14 +708,14 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         runOnUiThread {
             val alertBuilder: AlertDialog.Builder = AlertDialog.Builder(this)
             alertBuilder.setTitle("Location permission required")
-                .setMessage("To scan for BLE devices, apps need to be granted location access.")
-                .setCancelable(false)
-                .setPositiveButton("OK") { _, _ ->
-                    requestPermission(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        LOCATION_PERMISSION_REQUEST_CODE
-                    )
-                }
+                        .setMessage("To scan for BLE devices, apps need to be granted location access.")
+                        .setCancelable(false)
+                        .setPositiveButton("OK") { _, _ ->
+                            requestPermission(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                LOCATION_PERMISSION_REQUEST_CODE
+                            )
+                        }
             val alert = alertBuilder.create()
             alert.show()
         }
@@ -778,9 +785,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         return properties and property != 0
     }
 
-    //TODO: figure out how read packet works
     private fun readPacket() {
-        val char = getRWCharacteristic() //defined at line 851
+        val char = getRWCharacteristic()
         if (char?.isReadable() == true) {
             connectedDevice?.readCharacteristic(char)
         }
@@ -853,7 +859,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         val servUUID = UUID.fromString(SHUCKMASTER_SERV_UUID)
         val charUUID = UUID.fromString(SHUCKMASTER_CHAR_UUID)
 
-        return connectedDevice?.getService(servUUID)?.getCharacteristic(charUUID) //connectedDevice on line 410
+        return connectedDevice?.getService(servUUID)?.getCharacteristic(charUUID)
     }
 
     // Sets up scan results list UI element
