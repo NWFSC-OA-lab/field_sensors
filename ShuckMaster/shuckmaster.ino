@@ -11,11 +11,11 @@
 
 #include "src/TimedToggleRelay.h"
 
-Durafet df;
+Durafet df;  // Create Durafet as df
 
 TimedToggleRelay pump(23/* TODO pick GPIO pin*/, 5000);
 
-RTC_DS3231 rtc;
+RTC_DS3231 rtc;  // Instantiate Real-Time Clock as rtc
 FileLogger logger;
 char dataLabel[16] = "PH";
 
@@ -25,17 +25,17 @@ const uint8_t sensorID = 4;
 
 const uint32_t syncPattern = 0x04030201;
 
-const uint32_t eepromMagicAddress = 0x100;
+const uint32_t eepromMagicAddress = 0x100;  //Magic value and address used to see if a shuck master has been configured before
 const uint32_t eepromMagicValue = 0xCAFEF00D;
 
 char receiveBuf[256];
-PacketReceiver receiver(receiveBuf, syncPattern);
+PacketReceiver receiver(receiveBuf, syncPattern);  // create Reciever buffer to send data
 
 char sendBuf[256];
-PacketSender sender(sendBuf, syncPattern);
+PacketSender sender(sendBuf, syncPattern);  // create Reciever buffer to send data
 
+// Initialize all actions to false by default
 bool sending = false;
-
 bool sdHealthy = false;
 bool rtcHealthy = false;
 bool dfHealthy = false;
@@ -45,8 +45,10 @@ unsigned long lastPHStoredMillis = 0;
 
 struct Config cachedConfig;
 
+// Do we need to initialie a date and time object for the clock?
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(9600);  // Set Baud Rate to 9600
   Serial2.begin(9600);
   Wire.begin();
   if (logger.Init(53)) {
@@ -78,6 +80,7 @@ void setup() {
   pump.Begin();
 
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
+  // this sets the value, ph period, and the eeprommagicvalue/address
   uint32_t eepromMagic = 0;
   EEPROM.get(eepromMagicAddress, eepromMagic);
   //if (eepromMagic != eepromMagicValue) {
@@ -105,6 +108,7 @@ void setup() {
   Serial.println(cachedConfig.stdVoltage, 4);
 
   // update calibration with stored values
+  // Calibrates using the equation in the github wiki. 
   df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
   
   receiver.Begin();
