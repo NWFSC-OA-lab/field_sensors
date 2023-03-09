@@ -86,11 +86,11 @@ class Ezo_board{
 	//returns the error status of the last received command, 
 	//used to check the validity of the data returned by get_reading()
 	
-    uint8_t get_address();
-    //returns the address of the device
+    	uint8_t get_address();
+    	//returns the address of the device
     
-    void set_address(uint8_t address);
-    //lets you change the I2C address of the device
+    	void set_address(uint8_t address);
+    	//lets you change the I2C address of the device
 	
 	char* get_buffer();
 
