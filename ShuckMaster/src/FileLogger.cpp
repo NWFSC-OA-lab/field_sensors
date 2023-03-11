@@ -6,12 +6,14 @@
 TimeSpan ONE_DAY(1, 0, 0, 0);
 
 void printFile(File file, int indent = 0) {
+  // Prints out directory of where the file is.
   if (file.isDirectory()) {
     Serial.print(F(" DIR  "));
     for (int i = 0; i < indent; i++) {
       Serial.print("  ");
     }
     Serial.print(file.name());
+    
     // directory
     File entry;
     while (entry = file.openNextFile()) {
