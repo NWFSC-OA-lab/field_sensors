@@ -8,10 +8,11 @@
 #include "src/Packets.h"
 
 #include "src/Durafet.h"
-
+#include <Ezo_i2c.h>
 #include "src/TimedToggleRelay.h"
 
 Durafet df;  // Create Durafet as df
+Ezo_board EC = Ezo_board(100, "EC");      //create an EC circuit object who's address is 100 and name is "EC"
 
 TimedToggleRelay pump(23/* TODO pick GPIO pin*/, 5000);
 
@@ -29,7 +30,7 @@ const uint32_t eepromMagicAddress = 0x100;  //Magic value and address used to se
 const uint32_t eepromMagicValue = 0xCAFEF00D;
 
 char receiveBuf[256];
-PacketReceiver receiver(receiveBuf, syncPattern);  // create Reciever buffer to send data
+PacketReceiver receiver(receiveBuf, syncPattern);  // create Receiver buffer to send data
 
 char sendBuf[256];
 PacketSender sender(sendBuf, syncPattern);  // create Reciever buffer to send data
@@ -45,6 +46,18 @@ unsigned long lastPHStoredMillis = 0;
 
 struct Config cachedConfig;
 
+//Setting varaibles for the salinity sensor
+char* data;
+String data_string;
+char* token;
+const char *delimiter =","; //Used to parse through the data
+//float con;
+char* con;
+char* tds;
+char* sal;
+char* gravity;
+float salinity;
+float salinity_value;
 // Do we need to initialie a date and time object for the clock?
 
 void setup() {
@@ -88,7 +101,7 @@ void setup() {
     Serial.println("EEPROM magic value not found, initializing configuration");
     cachedConfig;
     cachedConfig.unixtime = rtc.now().unixtime();
-    cachedConfig.phPeriod = 10; // 10 seconds
+    cachedConfig.phPeriod = 1; // 1 second
     EEPROM.put(0, cachedConfig);
     EEPROM.put(eepromMagicAddress, eepromMagicValue);
   } else {
@@ -136,17 +149,23 @@ void loop() {
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
     float ph = df.GetPh();
     float temp = df.GetTemp();
-
-    Serial.print("Made pH and temperature measurements! pH: ");
+    salinity_value = salinityRead();
+    Serial.print("Made pH, temperature, and salinity measurements! pH: ");
     Serial.print(ph, 4);
     Serial.print(",\tTemperature: ");
     Serial.print(temp, 4);
     Serial.println(" C");
+    Serial.print(",\tSalinity: ");
+    Serial.print(salinity_value, 4);
+    Serial.println(" PSU(ppt)");
     // log ph
     logger.LogFloat(rtc.now(), "pH", ph);
 
     // log temperature
     logger.LogFloat(rtc.now(), "tp", temp);
+
+    // log salinity_value
+    logger.LogFloat(rtc.now(), "sa", salinity_value);
 
     // logger.LogFloat(rtc.now(), "pH", rtc.now().second());
     lastPHStoredMillis = millis();
@@ -191,6 +210,8 @@ void loop() {
 
     // add the label to the end of the packet
     logger.GetLabel(dataLabel);
+    Serial.print("Appending this label to the end of the packet: ");
+    Serial.println(dataLabel);
     sender.AddStr(dataLabel);
     
     // send packet
@@ -296,6 +317,8 @@ void loop() {
           Serial.println();
 
           strcpy(dataLabel, dataPacket.label);
+          Serial.print("This is the label: ");
+          Serial.println(dataPacket.label);
           
           // open logger between dates
           logger.Open(dateLow, dateHigh, dataLabel);
@@ -318,4 +341,45 @@ void loop() {
       receiver.Begin();
     }
   }
+}
+
+float salinityRead(){
+  
+  EC.send_read_cmd();
+  delay(700); //Need a delay of at least 7ms when we send the "R" command 
+  EC.receive_read_cmd();
+  //Serial.println();
+  data = EC.get_buffer();
+  data_string = String(data);
+  //Serial.print("This is the data: ");
+  //Serial.println(data_string);
+
+  //Serial.println("Now decomposing the data...");
+  data_decompose(data);
+  //Serial.println();
+  
+  //Serial.print("Extracting the salinity: ");
+  salinity = atof(sal); //converts the value to a float
+  //Serial.println(salinity);
+
+  return salinity;
+}
+
+//This function will parse through the char array and extract each data by removing the comma and creating tokens as substrings
+void data_decompose(char* buffer){
+  token = buffer;
+  //Serial.println();
+  con = strtok(token, delimiter);
+  //con = atof(strtok(token,delimiter));
+  tds = strtok(NULL, delimiter);
+  sal = strtok(NULL, delimiter);
+  gravity = strtok(NULL, delimiter);
+  //Serial.print("EC:");
+  //Serial.println(con);
+  //Serial.print("tds:");
+  //Serial.println(tds);
+  //Serial.print("salinity:");
+  //Serial.println(sal);
+  //Serial.print("Gravity:");
+  //Serial.println(gravity);
 }
