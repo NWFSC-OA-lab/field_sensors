@@ -460,7 +460,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     }
 
     // Requestable data types
-    private val labels = arrayOf("pH", "tp", "voltage")
+    private val labels = arrayOf("pH", "tp", "voltage", "sa")
 
     // Current data type to request
     private var currentLabel = labels[0]
