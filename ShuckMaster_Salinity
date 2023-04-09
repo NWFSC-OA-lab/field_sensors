@@ -57,7 +57,7 @@ char* tds;
 char* sal;
 char* gravity;
 float salinity;
-float salinity_value;
+float conductivity;
 // Do we need to initialie a date and time object for the clock?
 
 void setup() {
@@ -83,13 +83,16 @@ void setup() {
   lastByteReadMillis = millis();
   lastPHStoredMillis = millis();
 
+  df.Begin();
+  dfHealthy = true;
+/*
   if (df.Begin()) {
     Serial.println("Durafet initialized successfully");
     dfHealthy = true;
   } else {
     Serial.println("Couldn't find Durafet");
   }
-
+  */
   pump.Begin();
 
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
@@ -107,8 +110,7 @@ void setup() {
   } else {
     EEPROM.get(0, cachedConfig);
   }
-  
-  //TODO print statements for low and high conductivity values... too lazy to do that rn
+
   Serial.println("Config stored:");
   Serial.print("Last set time: ");
   Serial.println(cachedConfig.unixtime);
@@ -120,17 +122,15 @@ void setup() {
   Serial.println(cachedConfig.stdTemperature, 4);
   Serial.print("Standard Voltage: ");
   Serial.println(cachedConfig.stdVoltage, 4);
-  Serial.print("Standard low conductivity: ");
-  Serial.println(cachedConfig.stdLowCon, 4);
-  Serial.print("Standard high conductivity: ");
-  Serial.println(cachedConfig.stdHighCon, 4);
 
   // update calibration with stored values
   // Calibrates using the equation in the github wiki. 
+  //df.Calibrate(cachedConfig.stdOceanTemp, cachedConfig.stdPh, cachedConfig.stdVoltage);
   df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
-  //TODO: Set up dry calibration 
+  EC.send_cmd_with_num("K,",1);
   receiver.Begin();
   sending = false;
+
 }
 
 void printDate(const DateTime& date) {
@@ -147,49 +147,53 @@ void printDate(const DateTime& date) {
   Serial.print(date.second(), DEC);
 }
 
-void loop() {
-  df.Tick();
-  pump.Tick();
 
+void loop() {
+  //Serial.println("testing loop");
+  //df.Tick();
+  pump.Tick();
+  //Serial.println("Tesing if");
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
+    //Serial.println("in if");
     float ph = df.GetPh();
     float temp = df.GetTemp();
-    salinity_value = salinityRead();
-    //float conductivity = TODO 
-    //float salinity_value;
-    //float conduct_value;
-    //float dataBuffer[2];
-    //getEzoData(dataBuffer);
-    //salinity_value = dataBuffer[0];
-    //conduct_value  = dataBuffer[1];
+    //Serial.println("in if");
+    //salinity_value = salinityRead();
 
-
-    Serial.print("Made pH, temperature, salinityn and conductivity measurements! pH: ");
+    dataRead();
+    Serial.print("Made pH, temperature, salinity, and conductivity measurements! pH: ");
     Serial.print(ph, 4);
     Serial.print(",\tTemperature: ");
     Serial.print(temp, 4);
     Serial.println(" C");
     Serial.print(",\tSalinity: ");
-    Serial.print(salinity_value, 4);
+    Serial.print(salinity, 4);
     Serial.println(" PSU(ppt)");
-   // Serial.print(",\tConductivity: ");
-   // Serial.print(conduct_value, 4);
-   // Serial.println(" uS");
+    Serial.print(",\tConductivity: ");
+    Serial.print(conductivity, 4);
+    Serial.println(" uS");
+
     // log ph
+    //Serial.println("Testing logging");
     logger.LogFloat(rtc.now(), "pH", ph);
 
     // log temperature
     logger.LogFloat(rtc.now(), "tp", temp);
 
-    // log salinity_value
-    logger.LogFloat(rtc.now(), "sa", salinity_value);
+    // log salinity
+    logger.LogFloat(rtc.now(), "sa", salinity);
 
-    //logger.LogFloat(rtc.now(), "con", conduct_value);
+    // log conductivity
+    logger.LogFloat(rtc.now(), "co", conductivity);
+
     // logger.LogFloat(rtc.now(), "pH", rtc.now().second());
     lastPHStoredMillis = millis();
+    //Serial.println("finished logging");
+
   }
   
   if (sending) {
+    Serial.println("Testing sending");
     const int N = 10; // number of entries per packet, TODO put this somewhere else
     struct FileEntry entries[N];
     
@@ -244,6 +248,7 @@ void loop() {
   }
   
   if (hm10.available()) {
+    //Serial.println("Testing hm10av");
     char readByte = hm10.read();
     lastByteReadMillis = millis();    // save time we read a byte at
     if (receiver.AddByte(readByte)) {
@@ -284,12 +289,12 @@ void loop() {
         case PACKET_CONFIG: {
           Serial.println("Received Config packet");
           struct ConfigPacket configPacket = *((struct ConfigPacket *)(receiver.GetPacketData()));
-
           if (configPacket.configField & (1 << CONFIG_TIME)) {
             Serial.print("Configuring current time: ");
             DateTime newTime(configPacket.config.unixtime);
             printDate(newTime);
             Serial.println();
+            
             rtc.adjust(DateTime(configPacket.config.unixtime));
             rtcHealthy = true;  // we just updated the time, should be healthy again until power is lost again
           }
@@ -298,11 +303,18 @@ void loop() {
             Serial.println(configPacket.config.phPeriod);
             cachedConfig.phPeriod = configPacket.config.phPeriod;
           }
+          //if (configPacket.configField & (1 << CONFIG_STD_OCEANTEMP)) { //CONFIG_STD_TEMP
+          //  Serial.print("Calibrating with standard temperature: ");
+          //  Serial.println(configPacket.config.stdOceanTemp); //configPacket.config.stdTemperature
+          //  cachedConfig.stdOceanTemp = configPacket.config.stdOceanTemp;
+          //}
+
           if (configPacket.configField & (1 << CONFIG_STD_TEMP)) {
             Serial.print("Calibrating with standard temperature: ");
             Serial.println(configPacket.config.stdTemperature);
             cachedConfig.stdTemperature = configPacket.config.stdTemperature;
           }
+
           if (configPacket.configField & (1 << CONFIG_STD_PH)) {
             Serial.print("Calibrating with standard pH: ");
             Serial.println(configPacket.config.stdPh);
@@ -314,50 +326,67 @@ void loop() {
             cachedConfig.stdVoltage = configPacket.config.stdVoltage;
           }
           
-          //It's not going into these if-statements for some reason. Why is their condition written this way? It is because it has to be 8-bits???
-          //Figure out why the stdLowCon and stdHighCon are still set to 0.000
-
-          bool test = true; 
-          /*if (configPacket.configField & (1 << CONFIG_STD_LOWCON)) {
-            Serial.print("Calibrating with standard low conductivity: ");
-            Serial.println(configPacket.config.stdLowCon);
-            cachedConfig.stdLowCon = configPacket.config.stdLowCon;
-          }
-          */
-
-          if (test == true) {
-            Serial.print("Calibrating with standard low conductivity: ");
-            Serial.println(configPacket.config.stdLowCon);
-            cachedConfig.stdLowCon = configPacket.config.stdLowCon;
-          }
-
           /*
-          if (configPacket.configField & (1 << CONFIG_STD_HIGHCON)) {
+          if (configPacket.config.stdLowCon != 0 && configPacket.config.stdHighCon != 0){
+          
+            Serial.print("Calibrating with standard low conductivity: ");
+            Serial.println(configPacket.config.stdLowCon);
+            cachedConfig.stdLowCon = configPacket.config.stdLowCon;
+
             Serial.print("Calibrating with standard high conductivity: ");
             Serial.println(configPacket.config.stdHighCon);
             cachedConfig.stdHighCon = configPacket.config.stdHighCon;
+
           }
           */
 
-          if (test == true) {
+          if (configPacket.config.stdLowCon != 0.0){
+          
+            Serial.print("Calibrating with standard low conductivity: ");
+            Serial.println(configPacket.config.stdLowCon);
+            cachedConfig.stdLowCon = configPacket.config.stdLowCon;
+
+            EC.send_cmd_with_num("Cal,low,", cachedConfig.stdLowCon); //sending the command "Cal,low,#" 
+            Serial.print("stdLowCon= ");
+            Serial.println(cachedConfig.stdLowCon);
+          }
+
+          if(configPacket.config.stdHighCon != 0.0){
             Serial.print("Calibrating with standard high conductivity: ");
             Serial.println(configPacket.config.stdHighCon);
             cachedConfig.stdHighCon = configPacket.config.stdHighCon;
+
+            EC.send_cmd_with_num("Cal,high,", cachedConfig.stdHighCon); //sending the command "Cal,high,#"
+          }
+
+          
+          if(configPacket.config.stdTemperature != 0.0){
+            Serial.print("Calibrating with ocean temperature: ");
+            Serial.println(configPacket.config.stdTemperature);
+            cachedConfig.stdTemperature = configPacket.config.stdTemperature;
+            
+            EC.send_cmd_with_num("T,",cachedConfig.stdTemperature);
+
           }
           
+
           EEPROM.put(0, cachedConfig);
 
           // update durafet calibration values
           df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
 
           //update the salinity calibration values
-          EC.send_cmd_with_num("Cal,low,", cachedConfig.stdLowCon); //sending the command "Cal,low,#"
+          /*EC.send_cmd_with_num("Cal,low,", cachedConfig.stdLowCon); //sending the command "Cal,low,#" 
           Serial.print("stdLowCon= ");
           Serial.println(cachedConfig.stdLowCon);
           EC.send_cmd_with_num("Cal,high,", cachedConfig.stdHighCon); //sending the command "Cal,high,#"
           Serial.print("stdHighCon= ");
           Serial.println(cachedConfig.stdHighCon);
+          */
 
+          //Update Ocean Temperature 
+          //EC.send_cmd_with_num("T,",cachedConfig.stdTemperature);
+          
           break;
         }
         case PACKET_DATA: {
@@ -395,14 +424,18 @@ void loop() {
     }
   } else {
     // nothing available, restart receiver state machine if we've stalled for too long (5 seconds)
+    //Serial.println("testing restart");
     if (millis() - lastByteReadMillis > 5000) {
+      //Serial.println("restart");
       lastByteReadMillis = millis();
       receiver.Begin();
     }
   }
 }
 
-float salinityRead(){
+
+void dataRead(){
+
   EC.send_read_cmd();
   delay(700); //Need a delay of at least 7ms when we send the "R" command 
   EC.receive_read_cmd();
@@ -411,61 +444,32 @@ float salinityRead(){
   data_string = String(data);
   //Serial.print("This is the data: ");
   //Serial.println(data_string);
+
   //Serial.println("Now decomposing the data...");
   data_decompose(data);
   //Serial.println();
+  
+  conductivity = atof(con);
   //Serial.print("Extracting the salinity: ");
   salinity = atof(sal); //converts the value to a float
   //Serial.println(salinity);
-  return salinity;
 }
 
-/*
-float conductivityRead(){
-
-}
-*/
-float dataBuf[2];
-void getEzoData(float *dataBuf){
-  EC.send_read_cmd(); //send read command
-  delay(700); //Need a delay of at least 7ms when we send the "R" command 
-  EC.receive_read_cmd(); //receive data
-  //Serial.println();
-  data = EC.get_buffer(); //converts reading into a buffer of char
-  data_string = String(data);
-  Serial.print("This is the data: ");
-  Serial.println(data_string);
-  Serial.println("Now decomposing the data...");
-  data_decompose(data);
-  //Serial.println();
-  Serial.print("Extracting the data: ");
-  salinity = atof(sal); //converts the value to a float
-  float conductivity = atof(con);
-  Serial.println(salinity);
-  Serial.println(conductivity);
-  dataBuf[0] = salinity;
-
-  Serial.print("This is dataBuf[0] (sal): ");
-  Serial.println(dataBuf[0]);
-  dataBuf[1] = conductivity;
-
-  Serial.print("This is dataBuf[1] (con): ");
-  Serial.println(dataBuf[1]);
-}
-//This function will parse through the char array and extract each data by 
-//removing the comma and creating tokens as substrings
+//This function will parse through the char array and extract each data by removing the comma and creating tokens as substrings
 void data_decompose(char* buffer){
   token = buffer;
+  //Serial.println();
   con = strtok(token, delimiter);
+  //con = atof(strtok(token,delimiter));
   tds = strtok(NULL, delimiter);
   sal = strtok(NULL, delimiter);
   gravity = strtok(NULL, delimiter);
-  Serial.print("EC:");
-  Serial.println(con);
+  //Serial.print("EC:");
+  //Serial.println(con);
   //Serial.print("tds:");
   //Serial.println(tds);
-  Serial.print("salinity:");
-  Serial.println(sal);
+  //Serial.print("salinity:");
+  //Serial.println(sal);
   //Serial.print("Gravity:");
   //Serial.println(gravity);
 }
