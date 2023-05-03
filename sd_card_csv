@@ -1,0 +1,59 @@
+#include "SD.h"
+#include"SPI.h"
+//
+//the hardware CS pin (10 on most Arduino boards,
+// 53 on the Mega) must be left as an output or the SD
+// library functions will not work.
+const int CSpin = 53;
+String dataString =""; // holds the data to be written to the SD card
+float time = 1.11; // value read from your first sensor
+float pH = 2.22; // value read from your second sensor
+float temp = 3.33; // value read from your third sensor
+float salinity = 4.44;
+float conduct = 5.55;
+File sensorData;
+//
+//
+void setup(){
+  // Open serial communications
+  Serial.begin(9600);
+  Serial.print("Initializing SD card...");
+  pinMode(CSpin, OUTPUT);
+  //
+  // see if the card is present and can be initialized:
+  if (!SD.begin(CSpin)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    return;
+  }
+  if (!SD.exists("shuck.csv")){
+    Serial.println("card initialized.");
+    Serial.println("Now creating file...");
+    sensorData = SD.open("shuck.csv", FILE_WRITE);
+
+    if (sensorData){
+      Serial.println("File is open... now creating titles");
+      String titles = String("time") + "," + String("pH") + "," + String("temperature") + "," + String("salinity") + "," + String("conductivity"); // convert to CSV
+      sensorData.println(titles);
+      Serial.println("Done creating titles");
+      sensorData.close(); // you must close the file after you make changes to it so that the changes will save
+    }
+    else{
+      Serial.println("File failed to be created/opened");
+    }
+  }
+  Serial.println("Now saving sensor data");
+}
+
+void loop(){
+  //build the data string
+  sensorData = SD.open("shuck.csv", FILE_WRITE);
+  if(sensorData){
+    dataString = String(time) + "," + String(pH) + "," + String(temp)+ "," + String(salinity)+ "," + String(conduct); // convert to CSV
+    Serial.print("Now saving the string:");
+    Serial.println(dataString);
+    sensorData.println(dataString);
+    sensorData.close(); // close the file
+    delay(3000);
+  }
+}
