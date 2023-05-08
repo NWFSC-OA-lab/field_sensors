@@ -13,9 +13,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.*
-import android.support.v7.app.AppCompatActivity
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
+import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.SimpleItemAnimator
@@ -28,7 +28,6 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.LinearLayout
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.alert_label.*
 import kotlinx.android.synthetic.main.alert_label.view.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,6 +40,9 @@ import kotlin.math.min
 // Request code constants
 private const val ENABLE_BLUETOOTH_REQUEST_CODE = 1
 private const val LOCATION_PERMISSION_REQUEST_CODE = 2
+private const val COURSE_LOCATION_PERMISSION_REQUEST_CODE = 3
+private const val BLUETOOTH_SCAN_REQUEST_CODE = 4
+private const val BLUETOOTH_CONNECT_REQUEST_CODE = 5
 
 // Bounds for possible Maximum Transmission Unit sizes (Note: HM10 can't do anything but the min)
 private const val GATT_MIN_MTU_SIZE = 23
@@ -294,7 +296,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         ) {
             with (characteristic) {
                 if (service.uuid == UUID.fromString(SHUCKMASTER_SERV_UUID) &&
-                        uuid == UUID.fromString(SHUCKMASTER_CHAR_UUID)) {
+                    uuid == UUID.fromString(SHUCKMASTER_CHAR_UUID)) {
                     // Notification belongs to the right characteristic
 
                     // Give new data to the receiver to parse
@@ -327,6 +329,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         // Convert the packet data to a buffer, interpreted in little endian
         //TODO: Convert this process into a function to improve efficiency and readability
         val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN)
+        Log.i("ReceivedPacket", "This is the buffer")
+        Log.i("ReceivedPacket", "$buffer")
         when(packet.id) {
             PacketType.PING.code -> {
                 // received ping
@@ -344,26 +348,30 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 // received data
                 Log.i("ReceivedPacket", "Received Data")
                 Log.i("ReceivedPacket", "Data Information")
-                Log.i("ReceivedPacket", "${packet.data.toHexString()}")
-                Log.i("ReceivedPacket", "${String(packet.data)}")
+                Log.i("ReceivedPacket", packet.data.toHexString())
+                Log.i("ReceivedPacket", String(packet.data))
                 Log.i("ReceivedPacket", "End of data")
                 // translate data to a JSON object, then send it
                 val entries = mutableListOf<DataEntry>()
 
                 // get ID byte
                 val id = if (buffer.hasRemaining()) {
-                    buffer.get()
+
+                    buffer.get() //grabs this byte then moves to pointer to the next byte
+
                 } else {
                     0
                 }
-
+                Log.i("ReceivedPacket", "This is the id:")
+                Log.i("ReceivedPacket", "$id")
                 // get number of entries
                 val entryCount = if (buffer.hasRemaining()) {
                     buffer.get().toInt()
                 } else {
                     0
                 }
-
+                Log.i("ReceivedPacket", "This is the number of data:")
+                Log.i("ReceivedPacket", "$entryCount")
                 Log.i("Data", "$entryCount")
 
                 for (i in 0 until entryCount) {
@@ -384,14 +392,14 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 } else {
                     "inv"   // no label
                 }
-
+                Log.i("ReceivedPacket", "This is the label:")
+                Log.i("ReceivedPacket", label)
                 // build json packet with entries, send as batch
 
                 val array = JSONArray()
                 val dataArray = emptyArray<Float>()
                 entries.forEach { it ->
                     //it.entryValue is the actual data value
-                    //TODO: Figure out to print it.entryValue to the app
                     Log.i("ReceivedPacket", "$id\t${it.unixTime}\t${it.entryValue}\t$label")
                     val dataInfo = "$id\t${it.unixTime}\t${it.entryValue}\t$label"
                     print(dataInfo)
@@ -460,8 +468,8 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     }
 
     // Requestable data types
-    private val labels = arrayOf("pH", "tp", "voltage", "sa")
-
+    //private val labels = arrayOf("pH", "tp", "voltage", "sa")
+    private val labels = arrayOf("pH", "tp", "voltage", "sa", "co")
     // Current data type to request
     private var currentLabel = labels[0]
 
@@ -497,7 +505,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             writePacket(buffer.array())
         }
 
-        // Sends a health status packet
+        // Sends a health status packet7
         device_health_button.setOnClickListener {
             val buffer = ByteBuffer.allocate(7).order(ByteOrder.LITTLE_ENDIAN)
                 .put(SYNC_PATTERN)
@@ -551,17 +559,23 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             }
         }
 
-        // Sets calbration constants on the device
+        // Sets calibration constants on the device
         device_calibrate_button.setOnClickListener {
             runOnUiThread {
                 // Prompts the user to enter settings, sends command on confirmation
                 createPromptAlert(
                     "Set Calibration Constants ",
-                    "Set the temperature (C), pH, and voltage (V) as measured against the standard solution.",
+                    //"Set the temperature (C), pH, voltage (V), low conductivity (microsiemens), and high conductivity (microsiemens) as measured against the standard solution.",
+                    "Set the low conductivity (microsiemens) and high conductivity (microsiemens) as measured against the standard solution, and the measured ocean temperature",
                     mapOf(
-                        "temp" to 0.0f,
+                        //follow the same format when adding new calibration measurements
+                        "ocean temp" to 0.0f,
+                        //"ocean temp" to 0.0f,
                         "ph" to 0.0f,
-                        "voltage" to 0.0f
+                        "voltage" to 0.0f,
+                        "conductivity(low)" to 0.0f,
+                        "conductivity(high)" to 0.0f,
+
                     ),
                 ) { results ->
                     for (entry in results) {
@@ -570,27 +584,44 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                         }
                     }
 
-                    val temp = results["temp"]
+                    val temp = results["ocean temp"]
+                    //val oceanTemp = results["ocean Temp"]
                     val ph = results["ph"]
                     val voltage = results["voltage"]
-                    if (temp == null || ph == null || voltage == null) {
+                    val lowCon = results["conductivity(low)"]
+                    val highCon = results["conductivity(high)"]
+                    //val oceanTemp = results["ocean Temp"]
+
+                    if ( temp == null || ph == null || voltage == null || lowCon == null || highCon == null) {
                         return@createPromptAlert
                     }
 
+                    //if (temp == null || ph == null || voltage == null || lowCon == null || highCon == null) {
+                    //    return@createPromptAlert
+                    //}
+
                     val c = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
-                    val buffer = ByteBuffer.allocate(7 + 1 + 8 * 4).order(ByteOrder.LITTLE_ENDIAN)
-                        .put(SYNC_PATTERN)
-                        .putShort((1 + 1 + 8 * 4).toShort())
-                        .put(PacketType.CONFIG.code)
-                        .put(0b0001_1101)
-                        .putInt((c.time.time / 1000).toInt())
-                        .putInt(0)      // period
-                        .putFloat(temp)     // temperature
-                        .putFloat(ph)       // pH
-                        .putFloat(voltage)      // voltage
-                        .putInt(0)      // reserved 4
-                        .putInt(0)      // reserved 5
+                    val buffer = ByteBuffer.allocate(7 + 1 + 8 * 4).order(ByteOrder.LITTLE_ENDIAN) //Creating the packet to send the Arduino
+                        .put(SYNC_PATTERN) //Putting in the sync pattern byte
+                        .putShort((1 + 1 + 8 * 4).toShort()) //Putting in an extra byte TODO: Figure out why this is here and needed
+                        .put(PacketType.CONFIG.code) //Putting in the Packet type byte
+                        .put(0b0001_1101) //TODO: Figure out what this is and why we need it
+                        .putInt((c.time.time / 1000).toInt()) //Putting in the time in byte?
+                        .putInt(0)      // Putting in the period byte
+                        .putFloat(temp)     // Putting in the temperature byte
+                        .putFloat(ph)       // Putting in the pH byte
+                        .putFloat(voltage)      // Putting in the voltage byte
+                        .putFloat(lowCon) 
+                        .putFloat(highCon)
+                        //.putInt(0)      // reserved 4
+                        //.putInt(0)      // reserved 5
                         .putInt(0)      // reserved 6
+
+                    Log.i("Write", "lowCon:")
+                    Log.i("Write", "$lowCon")
+                    Log.i("Write", "highCon:")
+                    Log.i("Write", "$highCon")
+
                     Log.i("Write", buffer.array().toHexString())
                     writePacket(buffer.array())
                 }
@@ -641,7 +672,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         val arrAdapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            labels
+            labels //here we are creating a drop down list with the strings from the labels array we made earlier
         )
         arrAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         request_label_spinner.adapter = arrAdapter
@@ -692,10 +723,19 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         }
     }
 
+    //TODO: Figure out how to enable Bluetooth Connect and Scan Permissions
     private fun promptEnableBluetooth() {
         if (!bluetoothAdapter.isEnabled) {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             startActivityForResult(enableBtIntent, ENABLE_BLUETOOTH_REQUEST_CODE)
+            requestPermission(
+                Manifest.permission.BLUETOOTH_SCAN,
+                BLUETOOTH_SCAN_REQUEST_CODE
+            )
+            requestPermission(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                BLUETOOTH_CONNECT_REQUEST_CODE
+            )
         }
     }
 
@@ -708,14 +748,17 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         runOnUiThread {
             val alertBuilder: AlertDialog.Builder = AlertDialog.Builder(this)
             alertBuilder.setTitle("Location permission required")
-                        .setMessage("To scan for BLE devices, apps need to be granted location access.")
-                        .setCancelable(false)
-                        .setPositiveButton("OK") { _, _ ->
-                            requestPermission(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                LOCATION_PERMISSION_REQUEST_CODE
-                            )
-                        }
+                .setMessage("To scan for BLE devices, apps need to be granted location access.")
+                .setCancelable(false)
+                .setPositiveButton("OK") { _, _ ->
+                    requestPermission(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        LOCATION_PERMISSION_REQUEST_CODE
+                    )
+                    requestPermission(Manifest.permission.ACCESS_COARSE_LOCATION,
+                        COURSE_LOCATION_PERMISSION_REQUEST_CODE
+                    )
+                }
             val alert = alertBuilder.create()
             alert.show()
         }
@@ -807,7 +850,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 writeQueue.add(ba)
             }
             writePacket(writeQueue.pop())
-            return;
+            return
         }
         val char = getRWCharacteristic() ?: return
         val writeType = when {
@@ -952,4 +995,3 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     override fun onNothingSelected(parent: AdapterView<*>?) {
     }
 }
-
