@@ -43,7 +43,10 @@ unsigned long lastPHStoredMillis = 0;
 
 struct Config cachedConfig;
 
-//Setting varaibles for the salinity sensor
+//Setting variables for the Pico pH
+
+
+//Setting variables for the salinity sensor
 char* data;
 String data_string;
 char* token;
@@ -56,13 +59,14 @@ float salinity;
 float conductivity;
 
 //Initializing constants for the SD card (only used for creating the csv file)
-const int CSpin = 53;
+const int CSpin = 53; //SD card chip select is set to pin 53
 File sensorData;
 String dataString = "";
 // Do we need to initialize a date and time object for the clock?
 
 void setup() {
   Serial.begin(9600);  // Set Baud Rate to 9600
+  Serial1.begin(19200); //For the Pico pH
   Serial2.begin(9600);
   Wire.begin();
 
@@ -84,7 +88,7 @@ void setup() {
   }
   //
 
-//Checks if the SD card has a filed labeled AllData.csv. If not, then it will create the file with the labels for each data
+//Checks if the SD card has a file labeled AllData.csv. If not, then it will create the file with the labels for each data
  if (!SD.exists("AllData.csv")){
     Serial.println("card initialized.");
     Serial.println("Now creating file...");
@@ -149,7 +153,7 @@ void setup() {
   // Calibrates using the equation in the github wiki. 
   //df.Calibrate(cachedConfig.stdOceanTemp, cachedConfig.stdPh, cachedConfig.stdVoltage);
   //df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
-  EC.send_cmd_with_num("K,",1);
+  EC.send_cmd_with_num("K,",1); //setting the k value to 1
   receiver.Begin();
   sending = false;
 
@@ -181,9 +185,18 @@ void loop() {
     //float ph = df.GetPh();
     //float temp = df.GetTemp();
     //Serial.println("in if");
-    //salinity_value = salinityRead();
-
-    dataRead();
+    //salinity_value = salinity Read();
+   
+    Serial1.print("MEA 1 47")
+    delay(1000); //Adding a 1 second delay
+    String received_string = "";
+    while(Serial1.available() > 0) {
+      char received_char = Serial.read();
+      received_string += received_char; //need to decompose this string
+    }
+    ph = ;
+    temp = ;
+    ezoRead();
     Serial.print("Made pH, temperature, salinity, and conductivity measurements! pH: ");
     Serial.print(ph, 4);
     Serial.print(",\tTemperature: ");
@@ -335,36 +348,20 @@ void loop() {
             cachedConfig.phPeriod = configPacket.config.phPeriod;
           }
 
-          if (configPacket.configField & (1 << CONFIG_STD_TEMP)) {
-            Serial.print("Calibrating with standard temperature: ");
-            Serial.println(configPacket.config.stdTemperature);
-            cachedConfig.stdTemperature = configPacket.config.stdTemperature;
-          }
-
           if (configPacket.configField & (1 << CONFIG_STD_PH)) {
             Serial.print("Calibrating with standard pH: ");
             Serial.println(configPacket.config.stdPh);
             cachedConfig.stdPh = configPacket.config.stdPh;
           }
-          if (configPacket.configField & (1 << CONFIG_STD_V)) {
-            Serial.print("Calibrating with standard voltage: ");
-            Serial.println(configPacket.config.stdVoltage);
-            cachedConfig.stdVoltage = configPacket.config.stdVoltage;
-          }
-          
-          /*
-          if (configPacket.config.stdLowCon != 0 && configPacket.config.stdHighCon != 0){
-          
-            Serial.print("Calibrating with standard low conductivity: ");
-            Serial.println(configPacket.config.stdLowCon);
-            cachedConfig.stdLowCon = configPacket.config.stdLowCon;
 
-            Serial.print("Calibrating with standard high conductivity: ");
-            Serial.println(configPacket.config.stdHighCon);
-            cachedConfig.stdHighCon = configPacket.config.stdHighCon;
+          if (configPacket.configField & (1 << CONFIG_STD_TEMP)) {
+            Serial.print("Calibrating with standard temperature: ");
+            Serial.println(configPacket.config.stdTemperature);
+            cachedConfig.stdTemperature = configPacket.config.stdTemperature;
 
+            //EC.send_cmd_with_num("T,",cachedConfig.stdTemperature); 
+            //Dont need this because we will send the temperature compensation before every read
           }
-          */
 
           if (configPacket.config.stdLowCon != 0.0){
           
@@ -383,35 +380,12 @@ void loop() {
             cachedConfig.stdHighCon = configPacket.config.stdHighCon;
 
             EC.send_cmd_with_num("Cal,high,", cachedConfig.stdHighCon); //sending the command "Cal,high,#"
-          }
-
-          
-          if(configPacket.config.stdTemperature != 0.0){
-            Serial.print("Calibrating with ocean temperature: ");
-            Serial.println(configPacket.config.stdTemperature);
-            cachedConfig.stdTemperature = configPacket.config.stdTemperature;
-            
-            EC.send_cmd_with_num("T,",cachedConfig.stdTemperature);
-
-          }
-          
+          }          
 
           EEPROM.put(0, cachedConfig);
 
           // update durafet calibration values
-          df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
-
-          //update the salinity calibration values
-          /*EC.send_cmd_with_num("Cal,low,", cachedConfig.stdLowCon); //sending the command "Cal,low,#" 
-          Serial.print("stdLowCon= ");
-          Serial.println(cachedConfig.stdLowCon);
-          EC.send_cmd_with_num("Cal,high,", cachedConfig.stdHighCon); //sending the command "Cal,high,#"
-          Serial.print("stdHighCon= ");
-          Serial.println(cachedConfig.stdHighCon);
-          */
-
-          //Update Ocean Temperature 
-          //EC.send_cmd_with_num("T,",cachedConfig.stdTemperature);
+          //df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
           
           break;
         }
@@ -460,10 +434,10 @@ void loop() {
 }
 
 
-void dataRead(){
+void ezoRead(float temp){
 
-  EC.send_read_cmd();
-  delay(700); //Need a delay of at least 7ms when we send the "R" command 
+  EC.send_read_with_temp_comp(temp); //sending the "rt" command with 't' being the temperature compensation 
+  delay(700); //Need a delay of at least 7ms 
   EC.receive_read_cmd();
   //Serial.println();
   data = EC.get_buffer();
@@ -496,4 +470,17 @@ void data_decompose(char* buffer){
   //Serial.println(sal);
   //Serial.print("Gravity:");
   //Serial.println(gravity);
+}
+
+//This function will calibrate the pico pH. The sensor requires a two-point pH calibration so it takes in the low pH, high pH,
+//and the temperature and salinity of the calibration solution
+void pico_calibrate(float lowPH, float highPH, float temp, float sal){
+  // "CPH C N P T S"
+  String lowCommand = "CPH 1 0 " + String(lowPH) +  " " + String(temp) + " " + String(sal); 
+  Serial1.println(lowCommand);
+  Serial1.println("SVS 1"); //permanently saving configuration in flash memory
+  delay(1000);
+  String highCommand = "CPH 1 0 " + String(highPH) +  " " + String(temp) + " " + String(sal); 
+  Serial1.println(highCommand);
+  Serial1.println("SVS 1");
 }
