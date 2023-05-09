@@ -569,14 +569,13 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     "Set the low conductivity (microsiemens) and high conductivity (microsiemens) as measured against the standard solution, and the measured ocean temperature",
                     mapOf(
                         //follow the same format when adding new calibration measurements
-                        "ocean temp" to 0.0f,
-                        //"ocean temp" to 0.0f,
-                        "ph" to 0.0f,
-                        "voltage" to 0.0f,
+                        "temp" to 0.0f,
+                        "ph(low)" to 0.0f,
+                        "ph(high)" to 0.0f,
                         "conductivity(low)" to 0.0f,
                         "conductivity(high)" to 0.0f,
 
-                    ),
+                        ),
                 ) { results ->
                     for (entry in results) {
                         with (entry) {
@@ -584,15 +583,15 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                         }
                     }
 
-                    val temp = results["ocean temp"]
+                    val temp = results["temp"]
                     //val oceanTemp = results["ocean Temp"]
-                    val ph = results["ph"]
-                    val voltage = results["voltage"]
+                    val lowPH = results["ph(low)"]
+                    val highPH = results["ph(high)"]
                     val lowCon = results["conductivity(low)"]
                     val highCon = results["conductivity(high)"]
                     //val oceanTemp = results["ocean Temp"]
 
-                    if ( temp == null || ph == null || voltage == null || lowCon == null || highCon == null) {
+                    if ( temp == null || lowPH == null || highPH == null || lowCon == null || highCon == null) {
                         return@createPromptAlert
                     }
 
@@ -609,9 +608,9 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                         .putInt((c.time.time / 1000).toInt()) //Putting in the time in byte?
                         .putInt(0)      // Putting in the period byte
                         .putFloat(temp)     // Putting in the temperature byte
-                        .putFloat(ph)       // Putting in the pH byte
-                        .putFloat(voltage)      // Putting in the voltage byte
-                        .putFloat(lowCon) 
+                        .putFloat(lowPH)       // Putting in the pH byte
+                        .putFloat(highPH)      // Putting in the voltage byte
+                        .putFloat(lowCon)
                         .putFloat(highCon)
                         //.putInt(0)      // reserved 4
                         //.putInt(0)      // reserved 5
