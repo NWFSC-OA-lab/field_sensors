@@ -10,11 +10,8 @@
 #include "src/TimedToggleRelay.h"
 #include "SD.h"
 
-//Durafet df;  // Create Durafet as df
+
 Ezo_board EC = Ezo_board(100, "EC");      //create an EC circuit object who's address is 100 and name is "EC"
-
-//TimedToggleRelay pump(23/* TODO pick GPIO pin*/, 5000);
-
 RTC_DS3231 rtc;  // Instantiate Real-Time Clock as rtc
 FileLogger logger;
 char dataLabel[16] = "PH";
@@ -44,7 +41,27 @@ unsigned long lastPHStoredMillis = 0;
 struct Config cachedConfig;
 
 //Setting variables for the Pico pH
-
+const char *picoDelimiter =" ";
+char* command;
+char* channel;
+char* s_value;
+char* R0; //command status
+char* R1; //reserved 
+char* R2; //reserved 
+char* R3; //reserved 
+char* R4; //reserved 
+char* R5; //tempSample
+char* R6; //tempCase
+char* R7; //signalIntensity
+char* R8; //ambientLight
+char* R9; //pressure
+char* R10; //humidity
+char* R11; //resisorTemp
+char* R12; //reserved 
+char* R13; //reserved 
+char* R14; //pH
+//float pH;
+//float temperature;
 
 //Setting variables for the salinity sensor
 char* data;
@@ -62,6 +79,7 @@ float conductivity;
 const int CSpin = 53; //SD card chip select is set to pin 53
 File sensorData;
 String dataString = "";
+String fileName = "";
 // Do we need to initialize a date and time object for the clock?
 
 void setup() {
@@ -88,38 +106,8 @@ void setup() {
   }
   //
 
-//Checks if the SD card has a file labeled AllData.csv. If not, then it will create the file with the labels for each data
- if (!SD.exists("AllData.csv")){
-    Serial.println("card initialized.");
-    Serial.println("Now creating file...");
-    sensorData = SD.open("AllData.csv", FILE_WRITE);
-
-    if (sensorData){
-      Serial.println("File is open... now creating titles");
-      String titles = String("time") + "," + String("pH") + "," + String("temperature") + "," + String("salinity") + "," + String("conductivity"); // convert to CSV
-      sensorData.println(titles);
-      Serial.println("Done creating titles");
-      sensorData.close(); // close the file
-    }
-    else{
-      Serial.println("File failed to be created/opened");
-    }
-  }
-
   lastByteReadMillis = millis();
   lastPHStoredMillis = millis();
-
-  //df.Begin();
-  //dfHealthy = true;
-/*
-  if (df.Begin()) {
-    Serial.println("Durafet initialized successfully");
-    dfHealthy = true;
-  } else {
-    Serial.println("Couldn't find Durafet");
-  }
-  */
-  //pump.Begin();
 
   // check eeprom for magic value; if not written, assume first run and initialize persistent config
   // this sets the value, ph period, and the eeprommagicvalue/address
@@ -150,9 +138,6 @@ void setup() {
   Serial.println(cachedConfig.stdVoltage, 4);
 
   // update calibration with stored values
-  // Calibrates using the equation in the github wiki. 
-  //df.Calibrate(cachedConfig.stdOceanTemp, cachedConfig.stdPh, cachedConfig.stdVoltage);
-  //df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
   EC.send_cmd_with_num("K,",1); //setting the k value to 1
   receiver.Begin();
   sending = false;
@@ -175,18 +160,31 @@ void printDate(const DateTime& date) {
 
 
 void loop() {
-  //Serial.println("testing loop");
-  //df.Tick();
-  //pump.Tick();
-  //Serial.println("Tesing if");
-  sensorData = SD.open("AllData.csv", FILE_WRITE);
+
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
-    //Serial.println("in if");
-    //float ph = df.GetPh();
-    //float temp = df.GetTemp();
-    //Serial.println("in if");
-    //salinity_value = salinity Read();
-   
+    
+    //Checks if the SD card has a file for the current day. If not, then it will create the file with the labels for each data
+    DateTime name = rtc.now();
+    fileName = String(name.month()) + "_" + String(name.day()) + "_" + String(name.year()-2000) + ".csv"; //format should look like month_day_year
+    Serial.println(fileName);
+    if (!SD.exists(fileName)){
+      Serial.println("card initialized.");
+      Serial.println("Now creating file...");
+      sensorData = SD.open(fileName, FILE_WRITE);
+
+      if(sensorData){
+        Serial.println("File is open... now creating titles");
+        String titles = String("time") + "," + String("pH") + "," + String("temperature") + "," + String("salinity") + "," + String("conductivity"); // convert to CSV
+        sensorData.println(titles);
+        Serial.println("Done creating titles");
+        sensorData.close(); // close the file
+      }
+      else{
+        Serial.println("File failed to be created/opened");
+      }
+    }
+
+    /*
     Serial1.print("MEA 1 47")
     delay(1000); //Adding a 1 second delay
     String received_string = "";
@@ -196,7 +194,10 @@ void loop() {
     }
     ph = ;
     temp = ;
-    ezoRead();
+    */    
+    //float ph = 0.0;
+    //float temp = 25.0;
+    ezoRead(temp);
     Serial.print("Made pH, temperature, salinity, and conductivity measurements! pH: ");
     Serial.print(ph, 4);
     Serial.print(",\tTemperature: ");
@@ -222,18 +223,18 @@ void loop() {
     // log conductivity
     logger.LogFloat(rtc.now(), "co", conductivity);
 
-    // logger.LogFloat(rtc.now(), "pH", rtc.now().second());
     lastPHStoredMillis = millis();
     //Serial.println("finished logging");
 
     //if sensorData file is open, then log of all the measured data in the AllData.csv file
-    if(sensorData){
-      dataString = String(rtc.now()) + "," + String(pH) + "," + String(tp)+ "," + String(sa)+ "," + String(co); // convert to CSV
-      Serial.print("Now saving the string:");
-      Serial.println(dataString);
-      sensorData.println(dataString);
-      sensorData.close(); // close the file
-    }
+    sensorData = SD.open(fileName, FILE_WRITE);
+    DateTime time = rtc.now();
+    String timeStamp = String(time.month()) + "/" + String(time.day()) + "/" + String(time.year()) + "  " + String(time.hour()) +":"+ String(time.minute());
+    dataString = String(timeStamp) + "," + String(ph) + "," + String(temp)+ "," + String(salinity)+ "," + String(conductivity); // convert to CSV
+    Serial.print("Now saving the string: ");
+    Serial.println(dataString);
+    sensorData.println(dataString);
+    sensorData.close(); // close the file
   }
   
   if (sending) {
@@ -359,8 +360,6 @@ void loop() {
             Serial.println(configPacket.config.stdTemperature);
             cachedConfig.stdTemperature = configPacket.config.stdTemperature;
 
-            //EC.send_cmd_with_num("T,",cachedConfig.stdTemperature); 
-            //Dont need this because we will send the temperature compensation before every read
           }
 
           if (configPacket.config.stdLowCon != 0.0){
@@ -383,9 +382,6 @@ void loop() {
           }          
 
           EEPROM.put(0, cachedConfig);
-
-          // update durafet calibration values
-          //df.Calibrate(cachedConfig.stdTemperature, cachedConfig.stdPh, cachedConfig.stdVoltage);
           
           break;
         }
@@ -437,6 +433,7 @@ void loop() {
 void ezoRead(float temp){
 
   EC.send_read_with_temp_comp(temp); //sending the "rt" command with 't' being the temperature compensation 
+  //EC.send_read_cmd();
   delay(700); //Need a delay of at least 7ms 
   EC.receive_read_cmd();
   //Serial.println();
@@ -472,6 +469,39 @@ void data_decompose(char* buffer){
   //Serial.println(gravity);
 }
 
+/*
+//This function will parse through the char array and extract each data by removing the space and creating tokens as substrings
+void pico_read(){
+  Serial1.print("MEA 1 47")
+  delay(1000); //Adding a 1 second delay
+  String received_string = "";
+  while(Serial1.available() > 0) {
+    char received_char = Serial.read();
+    received_string += received_char; //need to decompose this string
+  }
+
+  token = *received_string;
+  Serial.println();
+  command = strtok(token, picoDelimiter);
+  channel = strtok(token,picoDelimiter);
+  s_value = strtok(NULL, picoDelimiter);
+  R0 = strtok(NULL, picoDelimiter);
+  R1 = strtok(NULL, picoDelimiter);
+  R2 = strtok(NULL, picoDelimiter);
+  R3 = strtok(NULL, picoDelimiter);
+  R4 = strtok(NULL, picoDelimiter);
+  R5 = strtok(NULL, picoDelimiter);
+  R6 = strtok(NULL, picoDelimiter);
+  R7 = strtok(NULL, picoDelimiter);
+  R8 = strtok(NULL, picoDelimiter);
+  R9 = strtok(NULL, picoDelimiter);
+  R10 = strtok(NULL, picoDelimiter);
+  R11 = strtok(NULL, picoDelimiter);
+  R12 = strtok(NULL, picoDelimiter);
+  R13 = strtok(NULL, picoDelimiter);
+  R14 = strtok(NULL, picoDelimiter);
+}
+
 //This function will calibrate the pico pH. The sensor requires a two-point pH calibration so it takes in the low pH, high pH,
 //and the temperature and salinity of the calibration solution
 void pico_calibrate(float lowPH, float highPH, float temp, float sal){
@@ -484,3 +514,4 @@ void pico_calibrate(float lowPH, float highPH, float temp, float sal){
   Serial1.println(highCommand);
   Serial1.println("SVS 1");
 }
+*/
