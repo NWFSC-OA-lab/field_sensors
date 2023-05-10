@@ -575,7 +575,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                         "conductivity(low)" to 0.0f,
                         "conductivity(high)" to 0.0f,
 
-                        ),
+                    ),
                 ) { results ->
                     for (entry in results) {
                         with (entry) {
