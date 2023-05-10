@@ -33,8 +33,10 @@ enum ConfigType {
   CONFIG_STD_TEMP = 2,
   CONFIG_STD_PH = 3,
   CONFIG_STD_V = 4,
-  CONFIG_RESERVED_4 = 5,
-  CONFIG_RESERVED_5 = 6,
+  CONFIG_STD_LOWCON = 5,
+  CONFIG_STD_HIGHCON = 6,
+  //CONFIG_RESERVED_4 = 5,
+  //CONFIG_RESERVED_5 = 6,
   CONFIG_RESERVED_6 = 7
 };
 
@@ -45,9 +47,13 @@ struct Config {
   float stdTemperature;
   float stdPh;
   float stdVoltage;
-  uint32_t reserved_4;
-  uint32_t reserved_5;
+  float stdLowCon;
+  float stdHighCon;
+  //float stdOceanTemp; //temp until we get a temperature sensor. Replace back with reserved_6
+  //uint32_t reserved_4;
+  //uint32_t reserved_5;
   uint32_t reserved_6;
+  
 };
 
 // ATMega2560 is 8-bit, no padding necessary
@@ -61,6 +67,6 @@ struct DataPacket {
   uint32_t unixLow;
   uint32_t unixHigh;
   char label[8];
-};
+  };
 
 #endif  // PACKETS_H_
