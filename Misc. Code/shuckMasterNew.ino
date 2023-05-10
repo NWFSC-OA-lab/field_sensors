@@ -184,19 +184,9 @@ void loop() {
       }
     }
 
-    /*
-    Serial1.print("MEA 1 47")
-    delay(1000); //Adding a 1 second delay
-    String received_string = "";
-    while(Serial1.available() > 0) {
-      char received_char = Serial.read();
-      received_string += received_char; //need to decompose this string
-    }
-    ph = ;
-    temp = ;
-    */    
-    //float ph = 0.0;
-    //float temp = 25.0;
+    pico_read(); 
+    float ph = atof(R14)/1000;
+    float temp = atof(R5)/1000;
     ezoRead(temp);
     Serial.print("Made pH, temperature, salinity, and conductivity measurements! pH: ");
     Serial.print(ph, 4);
@@ -438,7 +428,7 @@ void ezoRead(float temp){
   EC.receive_read_cmd();
   //Serial.println();
   data = EC.get_buffer();
-  data_string = String(data);
+  //data_string = String(data);
   //Serial.print("This is the data: ");
   //Serial.println(data_string);
   //Serial.println("Now decomposing the data...");
@@ -469,28 +459,37 @@ void data_decompose(char* buffer){
   //Serial.println(gravity);
 }
 
-/*
+
 //This function will parse through the char array and extract each data by removing the space and creating tokens as substrings
 void pico_read(){
-  Serial1.print("MEA 1 47")
-  delay(1000); //Adding a 1 second delay
+
+  Serial1.println("MEA 1 3");
+  //delay(1500);
   String received_string = "";
-  while(Serial1.available() > 0) {
-    char received_char = Serial.read();
-    received_string += received_char; //need to decompose this string
+  
+  while(Serial1.available() == 0) {
   }
 
-  token = *received_string;
+  received_string = Serial1.readStringUntil('\n')
+  //char received_char = Serial1.read();
+  //Serial.print("received_char:");
+  //Serial.println(received_char);
+  //received_string += received_char;
+
   Serial.println();
-  command = strtok(token, picoDelimiter);
-  channel = strtok(token,picoDelimiter);
+  Serial.print("This is the string: ");
+  Serial.println(received_string);
+
+  char *tokenP = received_string.c_str();
+  command = strtok(tokenP, picoDelimiter);
+  channel = strtok(NULL,picoDelimiter);
   s_value = strtok(NULL, picoDelimiter);
   R0 = strtok(NULL, picoDelimiter);
   R1 = strtok(NULL, picoDelimiter);
   R2 = strtok(NULL, picoDelimiter);
   R3 = strtok(NULL, picoDelimiter);
   R4 = strtok(NULL, picoDelimiter);
-  R5 = strtok(NULL, picoDelimiter);
+  R5 = strtok(NULL, picoDelimiter); //temperature
   R6 = strtok(NULL, picoDelimiter);
   R7 = strtok(NULL, picoDelimiter);
   R8 = strtok(NULL, picoDelimiter);
@@ -499,9 +498,12 @@ void pico_read(){
   R11 = strtok(NULL, picoDelimiter);
   R12 = strtok(NULL, picoDelimiter);
   R13 = strtok(NULL, picoDelimiter);
-  R14 = strtok(NULL, picoDelimiter);
+  R14 = strtok(NULL, picoDelimiter); //pH
+  Serial.println(R5);
+  Serial.println(R14);
 }
 
+/*
 //This function will calibrate the pico pH. The sensor requires a two-point pH calibration so it takes in the low pH, high pH,
 //and the temperature and salinity of the calibration solution
 void pico_calibrate(float lowPH, float highPH, float temp, float sal){
