@@ -130,12 +130,13 @@ void setup() {
   Serial.println(cachedConfig.unixtime);
   Serial.print("PH measurement period: ");
   Serial.println(cachedConfig.phPeriod);
-  Serial.print("Standard pH: ");
-  Serial.println(cachedConfig.stdPh, 4);
+  Serial.print("Standard pH (low): ");
+  Serial.println(cachedConfig.stdPhLow, 4);
+  Serial.print("Standard pH (high): ");
+  Serial.println(cachedConfig.stdPhHigh, 4);
   Serial.print("Standard Temperature: ");
   Serial.println(cachedConfig.stdTemperature, 4);
-  Serial.print("Standard Voltage: ");
-  Serial.println(cachedConfig.stdVoltage, 4);
+  
 
   // update calibration with stored values
   EC.send_cmd_with_num("K,",1); //setting the k value to 1
@@ -339,17 +340,30 @@ void loop() {
             cachedConfig.phPeriod = configPacket.config.phPeriod;
           }
 
+          /*
           if (configPacket.configField & (1 << CONFIG_STD_PH)) {
             Serial.print("Calibrating with standard pH: ");
             Serial.println(configPacket.config.stdPh);
             cachedConfig.stdPh = configPacket.config.stdPh;
           }
+          */
 
           if (configPacket.configField & (1 << CONFIG_STD_TEMP)) {
             Serial.print("Calibrating with standard temperature: ");
             Serial.println(configPacket.config.stdTemperature);
             cachedConfig.stdTemperature = configPacket.config.stdTemperature;
+            
+          }
+          //d configTemp = atof(cachedConfig.stdTemperature);
 
+          if (configPacket.config.stdPhHigh != 0.0){
+          
+            Serial.print("Two-Point Calibration with low pH and high pH: ");
+            Serial.println(configPacket.config.stdPhLow);
+            Serial.println(configPacket.config.stdPhHigh);
+            cachedConfig.stdPhLow = configPacket.config.stdPhLow;
+            cachedConfig.stdPhHigh = configPacket.config.stdPhHigh;
+            pico_calibrate(cachedConfig.stdPhLow, cachedConfig.stdPhHigh, cachedConfig.stdTemperature, salinity);
           }
 
           if (configPacket.config.stdLowCon != 0.0){
@@ -470,7 +484,7 @@ void pico_read(){
   while(Serial1.available() == 0) {
   }
 
-  received_string = Serial1.readStringUntil('\n')
+  received_string = Serial1.readStringUntil('\n');
   //char received_char = Serial1.read();
   //Serial.print("received_char:");
   //Serial.println(received_char);
@@ -503,10 +517,10 @@ void pico_read(){
   Serial.println(R14);
 }
 
-/*
+
 //This function will calibrate the pico pH. The sensor requires a two-point pH calibration so it takes in the low pH, high pH,
 //and the temperature and salinity of the calibration solution
-void pico_calibrate(float lowPH, float highPH, float temp, float sal){
+void pico_calibrate(double lowPH, double highPH, double temp, float sal){
   // "CPH C N P T S"
   String lowCommand = "CPH 1 0 " + String(lowPH) +  " " + String(temp) + " " + String(sal); 
   Serial1.println(lowCommand);
@@ -516,4 +530,3 @@ void pico_calibrate(float lowPH, float highPH, float temp, float sal){
   Serial1.println(highCommand);
   Serial1.println("SVS 1");
 }
-*/
