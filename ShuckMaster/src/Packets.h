@@ -31,8 +31,8 @@ enum ConfigType {
   
   // for future use
   CONFIG_STD_TEMP = 2,
-  CONFIG_STD_PH = 3,
-  CONFIG_STD_V = 4,
+  CONFIG_STD_PH_LOW = 3,
+  CONFIG_STD_PH_HIGH = 4,
   CONFIG_STD_LOWCON = 5,
   CONFIG_STD_HIGHCON = 6,
   //CONFIG_RESERVED_4 = 5,
@@ -45,8 +45,8 @@ struct Config {
   uint32_t unixtime;
   uint32_t phPeriod;
   float stdTemperature;
-  float stdPh;
-  float stdVoltage;
+  float stdPhLow;
+  float stdPhHigh;
   float stdLowCon;
   float stdHighCon;
   //float stdOceanTemp; //temp until we get a temperature sensor. Replace back with reserved_6
