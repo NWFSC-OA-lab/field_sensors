@@ -7,6 +7,10 @@ enum PacketType {
   PACKET_PING = 0x00,
   PACKET_HEALTH = 0x01,
   PACKET_CONFIG = 0x02,
+  HEALTH_RTC_ERROR = 0x04,
+  HEALTH_SD_ERROR = 0x05,
+  PICO_ERROR = 0x06,
+  PACKET_CONT = 0x07,
   PACKET_DATA = 0x08
 };
 
@@ -35,8 +39,7 @@ enum ConfigType {
   CONFIG_STD_PH_HIGH = 4,
   CONFIG_STD_LOWCON = 5,
   CONFIG_STD_HIGHCON = 6,
-  //CONFIG_RESERVED_4 = 5,
-  //CONFIG_RESERVED_5 = 6,
+
   CONFIG_RESERVED_6 = 7
 };
 
@@ -49,9 +52,6 @@ struct Config {
   float stdPhHigh;
   float stdLowCon;
   float stdHighCon;
-  //float stdOceanTemp; //temp until we get a temperature sensor. Replace back with reserved_6
-  //uint32_t reserved_4;
-  //uint32_t reserved_5;
   uint32_t reserved_6;
   
 };
