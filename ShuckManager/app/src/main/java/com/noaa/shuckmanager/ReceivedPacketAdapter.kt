@@ -28,7 +28,7 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
     override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-    //override fun onBindViewHolder(holder: ViewHolder) {
+        //override fun onBindViewHolder(holder: ViewHolder) {
         val item = items[position]
         holder.bind(item)
         //holder.bind(items)
@@ -39,7 +39,7 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
         fun bind(packet: Packet) {
 
             //From Here: We are doing the same process where we take the packet.data
-            //and decompose all of hte
+            //and decompose all of the bytes
             val buffer = ByteBuffer.wrap(packet.data).order(ByteOrder.LITTLE_ENDIAN)
 
             if(packet.id == PacketType.DATA.code) {
@@ -95,20 +95,77 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                     val value = it.entryValue
                     val type = label
                     val dataInfo =
-                        "${"ID:"}\t$id\t${"Date/Time:"}\t${dateformat.format(date)}\t${"Value:"}\t${it.entryValue}\t$label"
+                        "${"ID:"}\t$id\t${"Date/Time: "}\t${dateformat.format(date)}\t${" Value:"}\t${it.entryValue}\t$label"
                     view.packet_content.text = "[${dataInfo}]"
                 }
             }
-            //TODO: Print the ping, health, and config packets to the app. Probably use if-else or when
-            else {
-                    view.packet_content.text = "[${packet.id}] ${packet.data.toHexString()}"
+
+            else if(packet.id == PacketType.CURRENT_DATA.code){
+
+                val entries = mutableListOf<DataEntry>()
+
+                // get ID byte
+                val id = if (buffer.hasRemaining()) {
+                    buffer.get()
+
+                } else {
+                    0
                 }
+                Log.i("CurrentReading", "This is the id")
+                Log.i("CurrentReading", "$id")
+
+                // get number of entries
+                val entryCount = if (buffer.hasRemaining()) {
+                    buffer.get().toInt()
+
+                } else {
+                    0
+                }
+                Log.i("CurrentReading", "This is the entry count")
+                Log.i("CurrentReading", "$entryCount")
+                //val time = buffer.getFloat()
+                val pH = buffer.getFloat()
+                val temperature = buffer.getFloat()
+                val salinity = buffer.getFloat()
+                val conductivity = buffer.getFloat()
+                Log.i("CurrentReading", "This is the time")
+                Log.i("CurrentReading", "$pH")
+                Log.i("CurrentReading", "This is the entry")
+                Log.i("CurrentReading", "$temperature")
+                val idNumber = id
+                val dataInfo = "${"ID:"}\t$id\t${" pH:"}\t${pH}\t${", tp:"}\t${temperature}\t${", sa:"}\t${salinity}\t${", co:"}\t${conductivity}"
+                view.packet_content.text = "[${dataInfo}]"
+
             }
 
-            //AX: This will print out the data as a HEX string.
-            //view.packet_content.text = "[${String(packet.id)}] ${packet.data.toHexString()}"
-
+            else {
+                //view.packet_content.text = "[${packet.id}] ${packet.data.toHexString()}"
+                if (packet.id == PacketType.PING.code){
+                    view.packet_content.text = "Ping Success!"
+                } //Here is where the issue might be. Because the device is sending back a health packet, it
+                //  is printing this statement, despite there being an error or not
+                else if(packet.id == PacketType.HEALTH.code){
+                    view.packet_content.text = "Device is healthy!"
+                }
+                else if(packet.id == PacketType.RTC_ERROR.code){
+                    view.packet_content.text = "Device NOT healthy: RTC is bad!!!"
+                }
+                else if(packet.id == PacketType.SD_ERROR.code){
+                    view.packet_content.text = "Device NOT healthy: SD is bad!!!"
+                }
+                else if(packet.id == PacketType.PICO_ERROR.code){
+                    view.packet_content.text = "picoPH is not working correctly"
+                }
+                else if(packet.id == PacketType.CONFIG.code){
+                    view.packet_content.text = "Configuration complete"
+                }
+            }
         }
+
+        //AX: This will print out the data as a HEX string.
+        //view.packet_content.text = "[${String(packet.id)}] ${packet.data.toHexString()}"
+
     }
+}
 
 fun ByteArray.toHexString(): String = joinToString(separator = " ", prefix = "0x") { String.format("%02X", it)}
