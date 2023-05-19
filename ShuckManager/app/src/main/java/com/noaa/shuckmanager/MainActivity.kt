@@ -627,7 +627,21 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
             }
         }
 
+
+        current_reading.setOnClickListener{
+            val buffer = ByteBuffer.allocate(4 + 2 + 1 + 4 + 4 + currentLabel.length + 1).order(ByteOrder.LITTLE_ENDIAN)
+                .put(SYNC_PATTERN)
+                .putShort((9 + currentLabel.length + 1).toShort())
+                .put(PacketType.CURRENT_DATA.code)
+                .put(currentLabel.toByteArray()).put(0.toByte())       // null terminated label string
+            Log.i("Write", "Sending this message")
+            Log.i("Write", buffer.array().toHexString())
+            Log.i("Write", "$currentLabel")
+            writePacket(buffer.array())
+        }
+
         // Send a request based on current label and start/end dates
+
         device_request_button.setOnClickListener {
             val lowDate: Calendar
             val highDate: Calendar
@@ -638,7 +652,7 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                 lowDate = endDate
                 highDate = startDate
             }
-            //TODO:Figure_out_how_to_read_data_from_the_bluetooth_and_sd
+
             val buffer = ByteBuffer.allocate(4 + 2 + 1 + 4 + 4 + currentLabel.length + 1).order(ByteOrder.LITTLE_ENDIAN)
                 .put(SYNC_PATTERN)
                 .putShort((9 + currentLabel.length + 1).toShort())
