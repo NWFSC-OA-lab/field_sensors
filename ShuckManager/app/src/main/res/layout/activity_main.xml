@@ -58,6 +58,7 @@
         android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/device_scanning_layout">
 
@@ -177,6 +178,17 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/device_received_packets" />
 
+        <Button
+            android:id="@+id/current_reading"
+            android:layout_width="133dp"
+            android:layout_height="35dp"
+            android:text="current"
+            app:layout_constraintBottom_toTopOf="@+id/device_disconnect_button"
+            app:layout_constraintEnd_toEndOf="@+id/device_disconnect_button"
+            app:layout_constraintStart_toStartOf="@+id/start_date_button"
+            app:layout_constraintTop_toBottomOf="@+id/start_date_button"
+            app:layout_constraintVertical_bias="1.0" />
+
         <TextView
             android:id="@+id/textView"
             android:layout_width="wrap_content"
@@ -197,5 +209,7 @@
             app:layout_constraintEnd_toEndOf="@+id/device_request_button"
             app:layout_constraintHorizontal_bias="0.0"
             app:layout_constraintStart_toStartOf="parent" />
+
+
     </android.support.constraint.ConstraintLayout>
 </android.support.constraint.ConstraintLayout>
