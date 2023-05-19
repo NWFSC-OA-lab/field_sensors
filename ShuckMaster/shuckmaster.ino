@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <RTClib.h>
 #include <EEPROM.h>
+#include <string.h>
 #include "src/FileLogger.h"
 #include "src/util/PacketReceiver.h"
 #include "src/util/PacketSender.h"
@@ -15,6 +16,7 @@ Ezo_board EC = Ezo_board(100, "EC");      //create an EC circuit object who's ad
 RTC_DS3231 rtc;  // Instantiate Real-Time Clock as rtc
 FileLogger logger;
 char dataLabel[16] = "PH";
+char currentLabel[16] = "PH";
 
 HardwareSerial& hm10 = Serial2;
 
@@ -31,9 +33,12 @@ PacketSender sender(sendBuf, syncPattern);  // create Reciever buffer to send da
 
 // Initialize all actions to false by default
 bool sending = false;
+bool current_sending = false;
 bool sdHealthy = false;
 bool rtcHealthy = false;
-//bool dfHealthy = false;
+bool ezoHealthy = false;
+bool picoHealthy = false; 
+
 
 unsigned long lastByteReadMillis = 0;
 unsigned long lastPHStoredMillis = 0;
@@ -45,7 +50,7 @@ const char *picoDelimiter =" ";
 char* command;
 char* channel;
 char* s_value;
-char* R0; //command status
+char* R0; //sensor status
 char* R1; //reserved 
 char* R2; //reserved 
 char* R3; //reserved 
@@ -161,12 +166,15 @@ void printDate(const DateTime& date) {
 
 
 void loop() {
-
+  DateTime name = rtc.now();
+  fileName = String(name.month()) + "_" + String(name.day()) + "_" + String(name.year()-2000) + ".csv"; //format should look like month_day_year
+  float ph = 0.0;
+  float temp = 0.0 ;
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
     
     //Checks if the SD card has a file for the current day. If not, then it will create the file with the labels for each data
-    DateTime name = rtc.now();
-    fileName = String(name.month()) + "_" + String(name.day()) + "_" + String(name.year()-2000) + ".csv"; //format should look like month_day_year
+    //DateTime name = rtc.now();
+    //fileName = String(name.month()) + "_" + String(name.day()) + "_" + String(name.year()-2000) + ".csv"; //format should look like month_day_year
     Serial.println(fileName);
     if (!SD.exists(fileName)){
       Serial.println("card initialized.");
@@ -178,14 +186,16 @@ void loop() {
         String titles = String("time") + "," + String("pH") + "," + String("temperature") + "," + String("salinity") + "," + String("conductivity"); // convert to CSV
         sensorData.println(titles);
         Serial.println("Done creating titles");
-        sensorData.close(); // close the file
       }
       else{
         Serial.println("File failed to be created/opened");
+        sdHealthy = false;
       }
     }
 
     pico_read(); 
+    //float ph = atof(R14)/1000;
+    //float temp = atof(R5)/1000;
     float ph = atof(R14)/1000;
     float temp = atof(R5)/1000;
     ezoRead(temp);
@@ -217,7 +227,7 @@ void loop() {
     lastPHStoredMillis = millis();
     //Serial.println("finished logging");
 
-    //if sensorData file is open, then log of all the measured data in the AllData.csv file
+    //sensorData file is open, then log of all the measured data in the AllData.csv file
     sensorData = SD.open(fileName, FILE_WRITE);
     DateTime time = rtc.now();
     String timeStamp = String(time.month()) + "/" + String(time.day()) + "/" + String(time.year()) + "  " + String(time.hour()) +":"+ String(time.minute());
@@ -226,8 +236,25 @@ void loop() {
     Serial.println(dataString);
     sensorData.println(dataString);
     sensorData.close(); // close the file
+
+    if (current_sending){
+      Serial.println("Testing cont sending");
+      byte numEntries = 1; //Only want to send one reading at a time
+      sender.Begin(PACKET_CONT);
+      sender.AddByte(sensorID);// add sensor id
+      
+      // send number of entries
+      sender.AddByte((byte) (numEntries & 0xFF));
+      sender.AddFloat(float(ph));
+      sender.AddFloat(float(temp));
+      sender.AddFloat(float(salinity));
+      sender.AddFloat(float(conductivity));
+      sender.Send(hm10);
+      current_sending = false;
+    }
   }
   
+
   if (sending) {
     Serial.println("Testing sending");
     const int N = 10; // number of entries per packet, TODO put this somewhere else
@@ -304,20 +331,51 @@ void loop() {
           if (rtc.lostPower()) {
             // lost power since we last checked, unhealthy
             rtcHealthy = false;
+          } else {
+            rtcHealthy = true;
           }
+
+          sensorData = SD.open(fileName, FILE_WRITE);
+          if(!sensorData){
+            sdHealthy = false;
+          } else{
+            sdHealthy = true;
+          }
+
           if (rtcHealthy) {
             Serial.println("RTC Healthy!");
             healthPacket.healthField |= 1 << HEALTH_RTC;
+            Serial.println("Printing health Packet: " + String (healthPacket.healthField));
           } else {
             Serial.println("RTC Unhealthy!");
+            Serial.println("Printing rtc unhealthy health Packet: " + String (healthPacket.healthField));
+            sender.Begin(HEALTH_RTC_ERROR);
+            sender.Send(hm10);
+            break;
           }
           if (sdHealthy) {
             Serial.println("SD Healthy!");
             healthPacket.healthField |= 1 << HEALTH_SD;
+            Serial.println("Printing health Packet: " + String (healthPacket.healthField));
           } else {
             Serial.println("SD Unhealthy!");
+            sender.Begin(HEALTH_SD_ERROR);
+            sender.Send(hm10);
+            logger.Init(CSpin); //reinitialize the sd card
+            break;
           }
+
+          if (!picoHealthy) {
+            Serial.println("Pico is NOT working correctly");
+            sender.Begin(PICO_ERROR);
+            sender.Send(hm10);
+            pico_read(); //send a command to reinitialize the pico
+            break;
+          }
+
           sender.Begin(PACKET_HEALTH);
+          Serial.print("Printing the healthPacket: ");
+          //Serial.println((char *) &healthPacket);
           sender.AddBuf((char *) &healthPacket, sizeof(healthPacket));
           sender.Send(hm10);
           break;
@@ -340,21 +398,12 @@ void loop() {
             cachedConfig.phPeriod = configPacket.config.phPeriod;
           }
 
-          /*
-          if (configPacket.configField & (1 << CONFIG_STD_PH)) {
-            Serial.print("Calibrating with standard pH: ");
-            Serial.println(configPacket.config.stdPh);
-            cachedConfig.stdPh = configPacket.config.stdPh;
-          }
-          */
-
           if (configPacket.configField & (1 << CONFIG_STD_TEMP)) {
             Serial.print("Calibrating with standard temperature: ");
             Serial.println(configPacket.config.stdTemperature);
             cachedConfig.stdTemperature = configPacket.config.stdTemperature;
             
           }
-          //d configTemp = atof(cachedConfig.stdTemperature);
 
           if (configPacket.config.stdPhHigh != 0.0){
           
@@ -389,6 +438,14 @@ void loop() {
           
           break;
         }
+
+        case PACKET_CONT: { 
+          Serial.println("Now in the PACKET_CONT Case");
+          struct DataPacket dataPacket = *((struct DataPacket *)(receiver.GetPacketData()));
+          current_sending = true;
+          break;
+        }
+
         case PACKET_DATA: {
           Serial.println("Received Data packet");
           // if logger has available entries (currently sending data), ignore
@@ -513,15 +570,23 @@ void pico_read(){
   R12 = strtok(NULL, picoDelimiter);
   R13 = strtok(NULL, picoDelimiter);
   R14 = strtok(NULL, picoDelimiter); //pH
+  Serial.println(R0);
   Serial.println(R5);
   Serial.println(R14);
+  int temp;
+  temp = atof(R0);
+  if ( temp != 0){
+    picoHealthy = false;
+  } else{
+    picoHealthy = true;
+  }
 }
 
 
 //This function will calibrate the pico pH. The sensor requires a two-point pH calibration so it takes in the low pH, high pH,
 //and the temperature and salinity of the calibration solution
 void pico_calibrate(double lowPH, double highPH, double temp, float sal){
-  // "CPH C N P T S"
+  // format of the command: "CPH C N P T S"
   String lowCommand = "CPH 1 0 " + String(lowPH) +  " " + String(temp) + " " + String(sal); 
   Serial1.println(lowCommand);
   Serial1.println("SVS 1"); //permanently saving configuration in flash memory
