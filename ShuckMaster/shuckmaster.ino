@@ -301,7 +301,7 @@ void loop() {
     
     // send packet
     sender.Send(hm10);
-
+    
     // if no more entries, close logger
     if (!logger.Available()) {
       Serial.println("Closing...");
