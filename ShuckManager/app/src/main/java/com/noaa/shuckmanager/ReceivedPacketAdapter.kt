@@ -12,6 +12,16 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
 import java.text.SimpleDateFormat
+import android.os.Environment
+import java.io.File
+import java.io.FileReader
+import java.io.FileWriter
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.util.regex.Pattern
+
 
 class ReceivedPacketAdapter (private val items: List<Packet>):
 
@@ -46,6 +56,7 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
 
                 val entries = mutableListOf<DataEntry>()
 
+
                 // get ID byte
                 val id = if (buffer.hasRemaining()) {
                     buffer.get()
@@ -61,6 +72,7 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                 }
                 Log.i("Data", "$entryCount")
 
+
                 for (i in 0 until entryCount) {
                     Log.i("Data", "$i")
                     if (buffer.hasRemaining()) {
@@ -68,6 +80,7 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                         val entry = buffer.getFloat()
                         entries.add(DataEntry(time, entry))
                     }
+
                 }
 
                 // get label, minus null terminator if possible
@@ -80,6 +93,20 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                     "inv"   // no label
                 }
 
+                
+                val fileName = "${id}_${label}.csv"
+                //val fileName = "test2.csv"
+                val filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$fileName"
+                try {
+                    var fo = FileWriter(filePath,true)
+                    fo.write("$entries" + "\n")
+                    fo.close()
+                }catch (ex:Exception){
+                    print(ex.message)
+                }
+
+                //Uncomment this section if you want the requested data to show up on the screen
+                /*
                 entries.forEach {
                     //it.entryValue is the actual data value
 
@@ -92,12 +119,14 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                     val dateformat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                     dateformat.setTimeZone(TimeZone.getTimeZone("UTC"))
                     print(dateformat)
+
+                    val timeLabel = dateformat.format(date)
+                    Log.i("testDate", timeLabel)
                     val value = it.entryValue
                     val type = label
-                    val dataInfo =
-                        "${"ID:"}\t$id\t${"Date/Time: "}\t${dateformat.format(date)}\t${" Value:"}\t${it.entryValue}\t$label"
+                    val dataInfo = "${"ID:"}\t$id\t${"Date/Time: "}\t${dateformat.format(date)}\t${" Value:"}\t${it.entryValue}\t$label"
                     view.packet_content.text = "[${dataInfo}]"
-                }
+                }*/
             }
 
             else if(packet.id == PacketType.CURRENT_DATA.code){
@@ -128,14 +157,11 @@ class ReceivedPacketAdapter (private val items: List<Packet>):
                 val temperature = buffer.getFloat()
                 val salinity = buffer.getFloat()
                 val conductivity = buffer.getFloat()
-                Log.i("CurrentReading", "This is the time")
                 Log.i("CurrentReading", "$pH")
-                Log.i("CurrentReading", "This is the entry")
                 Log.i("CurrentReading", "$temperature")
                 val idNumber = id
                 val dataInfo = "${"ID:"}\t$id\t${" pH:"}\t${pH}\t${", tp:"}\t${temperature}\t${", sa:"}\t${salinity}\t${", co:"}\t${conductivity}"
                 view.packet_content.text = "[${dataInfo}]"
-
             }
 
             else {
