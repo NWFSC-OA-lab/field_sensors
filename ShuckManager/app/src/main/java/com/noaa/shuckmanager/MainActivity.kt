@@ -35,7 +35,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.text.SimpleDateFormat
 import java.util.*
+import java.io.File
 import kotlin.math.min
+
+
 
 // Request code constants
 private const val ENABLE_BLUETOOTH_REQUEST_CODE = 1
@@ -407,15 +410,27 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
                     val jsonEntry = JSONObject()
                     jsonEntry.put("sensorID", id)
                     jsonEntry.put("date", it.unixTime)
-                    jsonEntry.put(label, it.entryValue)
+                    jsonEntry.put("label", label)
+                    jsonEntry.put("entry", it.entryValue)
+
+                    var tempvar = JSONArray()
+                    tempvar.put(jsonEntry)
                     array.put(jsonEntry)
+                    httpRequestQueue.addRequest(
+                        "POST",
+                        "https://shuckfunction.azurewebsites.net/api/shuckhttptrigger",
+                        jsonEntry
+                        //JSONObject().put("batch", jsonEntry)
+                    )
                 }
                 //TODO: Set up the webserver and change the URL
-                httpRequestQueue.addRequest(
+
+                /*httpRequestQueue.addRequest(
                     "POST",
-                    "http://3.236.166.131:1337/newMeasurement",
+                    "https://shuckfunction.azurewebsites.net/api/shuckhttptrigger",
                     JSONObject().put("batch", array)
-                )
+
+                )*/
             }
         }
     }
