@@ -170,6 +170,29 @@ void loop() {
   fileName = String(name.month()) + "_" + String(name.day()) + "_" + String(name.year()-2000) + ".csv"; //format should look like month_day_year
   float ph = 0.0;
   float temp = 0.0 ;
+
+    if (current_sending){
+      pico_read(); 
+      //float ph = atof(R14)/1000;
+      //float temp = atof(R5)/1000;
+      float ph = atof(R14)/1000;
+      float temp = atof(R5)/1000;
+      ezoRead(temp);
+      Serial.println("Testing cont sending");
+      byte numEntries = 1; //Only want to send one reading at a time
+      sender.Begin(PACKET_CONT);
+      sender.AddByte(sensorID);// add sensor id
+      
+      // send number of entries
+      sender.AddByte((byte) (numEntries & 0xFF));
+      sender.AddFloat(float(ph));
+      sender.AddFloat(float(temp));
+      sender.AddFloat(float(salinity));
+      sender.AddFloat(float(conductivity));
+      sender.Send(hm10);
+      current_sending = false;
+    }
+
   if (rtcHealthy && sdHealthy && millis() - lastPHStoredMillis > cachedConfig.phPeriod * 1000) {
     
     //Checks if the SD card has a file for the current day. If not, then it will create the file with the labels for each data
@@ -237,21 +260,6 @@ void loop() {
     sensorData.println(dataString);
     sensorData.close(); // close the file
 
-    if (current_sending){
-      Serial.println("Testing cont sending");
-      byte numEntries = 1; //Only want to send one reading at a time
-      sender.Begin(PACKET_CONT);
-      sender.AddByte(sensorID);// add sensor id
-      
-      // send number of entries
-      sender.AddByte((byte) (numEntries & 0xFF));
-      sender.AddFloat(float(ph));
-      sender.AddFloat(float(temp));
-      sender.AddFloat(float(salinity));
-      sender.AddFloat(float(conductivity));
-      sender.Send(hm10);
-      current_sending = false;
-    }
   }
   
 
